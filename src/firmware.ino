@@ -74,6 +74,10 @@ void loop() {
             Serial.println(touch.getLastTouch());
             sleepPeriod = SLEEP_500MS;
         }
+        else if (touch.isProximity()) {
+            Serial.println("proximity event: ");
+            sleepPeriod = SLEEP_1S;
+        }
         else {
             Serial.print("release event: ");
             Serial.println(touch.getLastTouch());

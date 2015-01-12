@@ -71,13 +71,13 @@ bool
 TouchSequence::checkRepeatMode()
 {
     touched = MPR121.getTouchData(seq[idx - 1]);
-    proximity = MPR121.getTouchData(PROXIMITY_ELEC);
+    // proximity = MPR121.getTouchData(PROXIMITY_ELEC);
 #if defined(DEBUG_TOUCH)
     Serial.print("repeat: ");
-    Serial.print(touched ? "touch, " : "no touch, ");
-    Serial.println(proximity ? "proximity" : "no proximity");
+    Serial.println(touched ? "touch" : "no touch");
+    // Serial.println(proximity ? "proximity" : "no proximity");
 #endif
-    return touched || proximity;
+    return touched;
 }
 
 bool
@@ -91,23 +91,24 @@ TouchSequence::update()
     // clears the interrupt
     MPR121.updateTouchData();
 
-    if (touched && !interrupted)
-        return checkRepeatMode();
-
-    touched = false;
-    for (byte i = 0; i < electrodes.total; ++i) {
-        if (!MPR121.getTouchData(i))
-            continue;
+    if (idx > 0 && !interrupted)
+        touched = checkRepeatMode();
+    else {
+        touched = false;
+        for (byte i = 0; i < electrodes.total; ++i) {
+            if (!MPR121.getTouchData(i))
+                continue;
 #if defined(DEBUG_TOUCH)
-        Serial.print("touch: ");
-        Serial.println(i, DEC);
+            Serial.print("touch: ");
+            Serial.println(i, DEC);
 #endif
-        if (MPR121.isNewTouch(i)) {
-            seq[idx++] = i;
-            if (idx >= MAX_TOUCH_SEQ)
-                idx = MAX_TOUCH_SEQ;
+            if (MPR121.isNewTouch(i)) {
+                seq[idx++] = i;
+                if (idx >= MAX_TOUCH_SEQ)
+                    idx = MAX_TOUCH_SEQ;
+            }
+            touched = true;
         }
-        touched = true;
     }
 
     proximity = MPR121.getTouchData(PROXIMITY_ELEC);
@@ -116,7 +117,7 @@ TouchSequence::update()
     else if (seq[0] != 0xFF)
         proximityEvent = false;
 
-    return touched || proximity;
+    return touched;
 }
 
 void
