@@ -1,5 +1,4 @@
 #include "TouchSequence.h"
-#include <Wire.h>
 #include "MPR121.h"
 
 // #define DEBUG_TOUCH

@@ -4,10 +4,15 @@
 #include <avr/wdt.h>
 #include "LowPower.h"
 #include "TouchSequence.h"
+#include "RFM12B.h"
+
+#define NODEID      2
+#define NETWORKID   1
 
 static const int mpr121Addr   = 0x5A;
 static const int mpr121IntPin = 1;      // int 1 == pin 3
 
+RFM12B radio;
 TouchSequence touch(mpr121Addr, mpr121IntPin);
 period_t sleepPeriod = SLEEP_FOREVER;
 
@@ -16,6 +21,10 @@ void setup() {
     Serial.begin(57600);
     while (!Serial);
     Serial.println("initializing...");
+
+    radio.Initialize(NODEID, RF12_915MHZ, NETWORKID);
+    /* radio.Encrypt(KEY); */
+    radio.Sleep(); // sleep right away to save power
 
     touch.begin(5, 2);
 }
@@ -32,6 +41,11 @@ void sleep(period_t time) {
         wdt_disable();
     LowPower.powerDown(time, ADC_OFF, BOD_OFF);
 }
+
+struct PacketEvent {
+    byte gesture;
+    byte touchid;
+};
 
 void handleEvent() {
     switch (touch.getGesture()) {
