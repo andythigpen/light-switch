@@ -4,3 +4,6 @@
 [submodule "lib/LowPower"]
 	path = lib/LowPower
 	url = https://github.com/rocketscream/Low-Power.git
+[submodule "lib/RFM12B"]
+	path = lib/RFM12B
+	url = https://github.com/LowPowerLab/RFM12B.git
