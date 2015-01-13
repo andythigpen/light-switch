@@ -7,6 +7,8 @@
   #include <WProgram.h> // Arduino 0022
 #endif
 
+#include "TouchEvent.h"
+
 #ifndef MAX_TOUCH_SEQ
 #define MAX_TOUCH_SEQ 4
 #endif
@@ -18,17 +20,6 @@ struct Electrodes {
     byte left;
     byte right;
     byte center;
-};
-
-enum TouchGesture {
-    TOUCH_UNKNOWN,
-    TOUCH_TAP,
-    TOUCH_DOUBLE_TAP,
-    TOUCH_SWIPE_UP,
-    TOUCH_SWIPE_DOWN,
-    TOUCH_SWIPE_LEFT,
-    TOUCH_SWIPE_RIGHT,
-    TOUCH_PROXIMITY,
 };
 
 class TouchSequence {

@@ -1,0 +1,15 @@
+#ifndef TOUCHEVENT_H
+#define TOUCHEVENT_H
+
+enum TouchGesture {
+    TOUCH_UNKNOWN,
+    TOUCH_TAP,
+    TOUCH_DOUBLE_TAP,
+    TOUCH_SWIPE_UP,
+    TOUCH_SWIPE_DOWN,
+    TOUCH_SWIPE_LEFT,
+    TOUCH_SWIPE_RIGHT,
+    TOUCH_PROXIMITY,
+};
+
+#endif // TOUCHEVENT_H

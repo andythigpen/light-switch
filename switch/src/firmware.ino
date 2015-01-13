@@ -8,6 +8,7 @@
 
 #define NODEID      2
 #define NETWORKID   1
+#define GATEWAYID   1
 
 static const int mpr121Addr   = 0x5A;
 static const int mpr121IntPin = 1;      // int 1 == pin 3
@@ -42,13 +43,20 @@ void sleep(period_t time) {
     LowPower.powerDown(time, ADC_OFF, BOD_OFF);
 }
 
-struct PacketEvent {
-    byte gesture;
-    byte touchid;
-};
+//TODO: move to a shared lib
+typedef struct {
+    int nodeid;
+    int event;
+    int electrode;
+} Payload;
+Payload data;
+
 
 void handleEvent() {
-    switch (touch.getGesture()) {
+    data.nodeid = NODEID;
+    data.event = touch.getGesture();
+    data.electrode = touch.getLastTouch();
+    switch (data.event) {
         case TOUCH_SWIPE_DOWN:
             Serial.println("swipe down");
             break;
@@ -63,19 +71,22 @@ void handleEvent() {
             break;
         case TOUCH_TAP:
             Serial.print("tap ");
-            Serial.println(touch.getLastTouch());
+            Serial.println(data.electrode);
             break;
         case TOUCH_DOUBLE_TAP:
             Serial.print("double tap ");
-            Serial.println(touch.getLastTouch());
+            Serial.println(data.electrode);
             break;
         case TOUCH_PROXIMITY:
             Serial.println("proximity");
             break;
         default:
             Serial.println("no gesture");
-            break;
+            return;
     }
+    radio.Wakeup();
+    radio.Send(GATEWAYID, (const void*)(&data), sizeof(data), false);
+    radio.Sleep();
 }
 
 void loop() {
