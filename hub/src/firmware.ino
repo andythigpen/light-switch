@@ -2,6 +2,7 @@
 // Capacitive touch light switch hub
 //
 #include <RFM12B.h>
+#include "TouchEvent.h"
 
 RFM12B radio;
 
@@ -42,6 +43,35 @@ void loop() {
                 Serial.print(data.event);
                 Serial.print(" elec:  ");
                 Serial.print(data.electrode);
+                Serial.println();
+                switch (data.event) {
+                    case TOUCH_SWIPE_DOWN:
+                        Serial.println("swipe down");
+                        break;
+                    case TOUCH_SWIPE_UP:
+                        Serial.println("swipe up");
+                        break;
+                    case TOUCH_SWIPE_LEFT:
+                        Serial.println("swipe left");
+                        break;
+                    case TOUCH_SWIPE_RIGHT:
+                        Serial.println("swipe right");
+                        break;
+                    case TOUCH_TAP:
+                        Serial.print("tap ");
+                        Serial.println(data.electrode);
+                        break;
+                    case TOUCH_DOUBLE_TAP:
+                        Serial.print("double tap ");
+                        Serial.println(data.electrode);
+                        break;
+                    case TOUCH_PROXIMITY:
+                        Serial.println("proximity");
+                        break;
+                    default:
+                        Serial.println("no gesture");
+                        break;
+                }
             }
 
             if (radio.ACKRequested()) {
