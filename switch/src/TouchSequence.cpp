@@ -13,7 +13,7 @@ static void wakeUpInt1() {
 
 TouchSequence::TouchSequence(byte mpr121Addr, byte interruptPin) :
     mpr121Addr(mpr121Addr), interruptPin(interruptPin), idx(0), touched(false),
-    proximityEvent(false)
+    proximityEvent(false), proximityMode(0)
 {
     electrodes.total  = 12;
     electrodes.top    = ELECTRODE_TOP;
@@ -24,21 +24,32 @@ TouchSequence::TouchSequence(byte mpr121Addr, byte interruptPin) :
 }
 
 void
-TouchSequence::begin(byte electrodes, byte proxMode)
+TouchSequence::begin(byte electrodes, byte proximityMode)
 {
     if (electrodes <= 12 && electrodes >= 0)
         this->electrodes.total = electrodes;
+
+    this->proximityMode = proximityMode;
 
     if (!MPR121.begin(mpr121Addr)) {
         Serial.print("MPR121 error: ");
         Serial.println(MPR121.getError());
     }
+    
+    applySettings();
+    clear();
+}
+
+void 
+TouchSequence::applySettings()
+{
     MPR121_settings_t settings;
     settings.TTHRESH = 10;
     settings.RTHRESH = 5;
     settings.INTERRUPT = interruptPin ? 3 : 2;
     // Baseline tracking enabled
-    settings.ECR = 0x80 | (this->electrodes.total & 0x0F) | ((proxMode & 0x03) << 4);
+    settings.ECR = 0x80 | (electrodes.total & 0x0F) | 
+                   ((proximityMode & 0x03) << 4);
 #if defined(DEBUG_TOUCH)
     Serial.print("ECR: ");
     Serial.println(settings.ECR, HEX);
@@ -46,12 +57,10 @@ TouchSequence::begin(byte electrodes, byte proxMode)
     MPR121.applySettings(&settings);
 
     // proximity threshold settings
-    if (proxMode) {
+    if (proximityMode) {
         MPR121.setReleaseThreshold(ELECTRODE_PROXIMITY, 1);
         MPR121.setTouchThreshold(ELECTRODE_PROXIMITY, 2);
     }
-
-    clear();
 }
 
 void
@@ -63,6 +72,30 @@ TouchSequence::setElectrodes(struct Electrodes &electrodes)
     this->electrodes.bottom = electrodes.bottom;
     this->electrodes.right  = electrodes.right;
     this->electrodes.center = electrodes.center;
+    applySettings();
+}
+
+void
+TouchSequence::sleep()
+{
+    // save the total and then shut them all off (except proximity)
+    totalElectrodes = electrodes.total;
+    electrodes.total = 0;
+    applySettings();
+}
+
+bool
+TouchSequence::wasAsleep()
+{
+    return electrodes.total == 0;
+}
+
+void
+TouchSequence::wakeUp()
+{
+    // restore the previous configuration
+    electrodes.total = totalElectrodes;
+    applySettings();
 }
 
 bool

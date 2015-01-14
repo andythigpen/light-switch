@@ -28,6 +28,7 @@ void setup() {
     radio.Sleep(); // sleep right away to save power
 
     touch.begin(5, 2);
+    touch.sleep();
 }
 
 void sleep(period_t time) {
@@ -96,6 +97,9 @@ void loop() {
         else if (touch.isProximity()) {
             Serial.println("proximity event: ");
             sleepPeriod = SLEEP_2S;
+            if (touch.wasAsleep()) {
+                touch.wakeUp();
+            }
         }
         else {
             Serial.print("release event: ");
@@ -116,6 +120,7 @@ void loop() {
         // clear everything to reset.
         handleEvent(0);
         touch.clear();
+        touch.sleep();
         Serial.println("Sleeping forever");
         Serial.println();
         sleepPeriod = SLEEP_FOREVER;

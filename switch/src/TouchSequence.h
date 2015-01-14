@@ -31,20 +31,27 @@ class TouchSequence {
         TouchSequence(byte mpr121Addr, byte interruptPin);
 
         // Initialize the TouchSequence instance, MPR121 library
-        //   electrodes:   number of electrodes to enable (1-12, 0 = disabled)
-        //   proxMode:     0 = disabled
-        //                 1 = electrodes 0-1
-        //                 2 = electrodes 0-3
-        //                 3 = electrodes 0-11
-        void begin(byte electrodes, byte proxMode);
+        //   electrodes:    number of electrodes to enable (1-12, 0 = disabled)
+        //   proximityMode: 0 = disabled
+        //                  1 = electrodes 0-1
+        //                  2 = electrodes 0-3
+        //                  3 = electrodes 0-11
+        void begin(byte electrodes, byte proximityMode);
         // attaches the hardware interrupt
         // the interrupt will automatically be detached when it runs, so
         // enableInterrupt must be called again prior to going to sleep
         void enableInterrupt();
         // configure the electrode directions/total
-        // NOTE: setting the total after calling begin() has no effect on
-        //       the MPR121 IC.
         void setElectrodes(struct Electrodes &electrodes);
+
+        // shuts down everything but the proximity sensor to conserve power
+        // NOTE: if the proximity sensor is disabled, and no other external
+        //       interrupts or timers are enabled, this could cause the mcu
+        //       to sleep forever.
+        void sleep();
+        bool wasAsleep();
+        // re-enables all electrodes
+        void wakeUp();
 
         // checks the sensors for any new inputs and adds them to the touch
         // sequence
@@ -78,6 +85,7 @@ class TouchSequence {
         TouchGesture getGesture();
 
     protected:
+        void applySettings();
         bool checkRepeatMode();
         TouchGesture checkShortSwipe();
         TouchGesture checkLongSwipe();
@@ -92,6 +100,8 @@ class TouchSequence {
         // true on a proximity event until a touch/clear
         bool proximityEvent;
         struct Electrodes electrodes;
+        byte totalElectrodes;           // used for sleeping
+        byte proximityMode;
 };
 
 #endif // TOUCHSEQUENCE_H
