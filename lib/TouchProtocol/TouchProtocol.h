@@ -1,5 +1,5 @@
-#ifndef TOUCHEVENT_H
-#define TOUCHEVENT_H
+#ifndef TOUCHPROTOCOL_H
+#define TOUCHPROTOCOL_H
 
 enum TouchGesture {
     TOUCH_UNKNOWN,
@@ -12,4 +12,4 @@ enum TouchGesture {
     TOUCH_PROXIMITY,
 };
 
-#endif // TOUCHEVENT_H
+#endif // TOUCHPROTOCOL_H

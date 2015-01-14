@@ -44,6 +44,7 @@ void sleep(period_t time) {
 }
 
 //TODO: move to a shared lib
+//TODO: add a repeated flag
 typedef struct {
     int nodeid;
     int event;

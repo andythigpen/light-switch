@@ -2,7 +2,7 @@
 // Capacitive touch light switch hub
 //
 #include <RFM12B.h>
-#include "TouchEvent.h"
+#include "TouchProtocol.h"
 
 RFM12B radio;
 
