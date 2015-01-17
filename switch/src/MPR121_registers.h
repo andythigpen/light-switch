@@ -4,8 +4,7 @@
 #define MIN_WRITE_REG   0x1E      // smallest writable register
 #define MAX_WRITE_REG   0x7F      // largest writable register
 
-#define REGISTER(x)     (x - MIN_WRITE_REG)
-
+// MPR121 registers
 #define ELE0_7          0x00
 #define ELE8_PROX       0x01
 #define OOR0_7          0x02
@@ -55,7 +54,7 @@
 #define NHDR            0x2C
 #define NCLR            0x2D
 #define FDLR            0x2E
-#define MHDR            0x2F
+#define MHDF            0x2F
 #define NHDF            0x30
 #define NCLF            0x31
 #define FDLF            0x32

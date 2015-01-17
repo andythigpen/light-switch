@@ -14,12 +14,17 @@
 #endif
 
 struct Electrodes {
-    byte total;
     byte top;
     byte bottom;
     byte left;
     byte right;
     byte center;
+};
+
+enum SleepMode {
+    SLEEP_ELECTRODES_OFF,
+    SLEEP_PROXIMITY_OFF,
+    SLEEP_ALL_OFF
 };
 
 class TouchSequence {
@@ -42,15 +47,17 @@ class TouchSequence {
         // enableInterrupt must be called again prior to going to sleep
         void enableInterrupt();
         // configure the electrode directions/total
-        void setElectrodes(struct Electrodes &electrodes);
+        //  total:      the number of electrodes to enable
+        //  electrodes: directional electrodes used for gestures
+        void setElectrodes(byte total, Electrodes &electrodes);
 
         // shuts down everything but the proximity sensor to conserve power
         // NOTE: if the proximity sensor is disabled, and no other external
         //       interrupts or timers are enabled, this could cause the mcu
         //       to sleep forever.
-        void sleep();
-        bool wasAsleep();
-        // re-enables all electrodes
+        void sleep(SleepMode mode);
+        // bool isAsleep();
+        // re-enables electrodes
         void wakeUp();
 
         // checks the sensors for any new inputs and adds them to the touch
@@ -71,6 +78,8 @@ class TouchSequence {
         // returns false otherwise
         // modified by a call to update()
         bool isTouched();
+        bool isTouched(byte electrode);
+
         // returns true if there is an ongoing proximity event
         // returns false otherwise
         // modified by a call to update()
@@ -84,24 +93,64 @@ class TouchSequence {
         // which electrode was touched
         TouchGesture getGesture();
 
+        // returns true if any of the electrodes/proximity sensors are on
+        bool isRunning();
+
     protected:
-        void applySettings();
-        bool checkRepeatMode();
+        bool setRegister(byte reg, byte val);
+        byte getRegister(byte reg);
+        // void enterRunMode();
+        // void enterStopMode();
+        void setTouchThreshold(byte val, byte reg=0xFF);
+        void setReleaseThreshold(byte val, byte reg=0xFF);
+
+        void applySettings(struct MPR121Settings&);
+        void applyFilter(byte baseReg, struct MPR121Filter&);
         TouchGesture checkShortSwipe();
         TouchGesture checkLongSwipe();
         TouchGesture checkTap();
 
+        byte errorCode;
         byte mpr121Addr;
         byte interruptPin;
         byte seq[MAX_TOUCH_SEQ];
         byte idx;
-        bool touched;
-        bool proximity;
         // true on a proximity event until a touch/clear
         bool proximityEvent;
         struct Electrodes electrodes;
-        byte totalElectrodes;           // used for sleeping
-        byte proximityMode;
+
+        bool running;
+        struct {
+            union {
+                byte ecr;
+                struct {
+                    byte ele_en:4;
+                    byte eleprox_en:2;
+                    byte cl:2;
+                };
+            };
+            union {
+                int all;
+                byte status[2];
+                struct {
+                    byte ele0:1;
+                    byte ele1:1;
+                    byte ele2:1;
+                    byte ele3:1;
+                    byte ele4:1;
+                    byte ele5:1;
+                    byte ele6:1;
+                    byte ele7:1;
+                    byte ele8:1;
+                    byte ele9:1;
+                    byte ele10:1;
+                    byte ele11:1;
+                    byte eleprox:1;
+                    byte undef:2;
+                    byte ovcf:1;
+                };
+            } touched;
+        } mpr121;
 };
 
 #endif // TOUCHSEQUENCE_H
