@@ -136,6 +136,10 @@ TouchSequence::begin(byte electrodes, byte proximityMode)
 
     MPR121Settings defaults;
     applySettings(defaults);
+    setTouchThreshold(10);
+    setReleaseThreshold(5);
+    // start in run mode
+    wakeUp();
     clear();
 }
 
