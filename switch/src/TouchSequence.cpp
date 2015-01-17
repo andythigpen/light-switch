@@ -366,8 +366,8 @@ TouchSequence::isRunning()
 void
 TouchSequence::wakeUp()
 {
-    if (running)
-        return;
+    // if (running)
+        // return;
     // restore the current configuration
     DEBUG_("wakeUp: setting ECR register to: ");
     DEBUG_FMT(mpr121.ecr, HEX);
@@ -401,8 +401,10 @@ TouchSequence::update()
             DEBUG("repeat: ", i);
     }
 
-    if (mpr121.touched.eleprox && seq[0] == 0xFF)
+    if (mpr121.touched.eleprox && seq[0] == 0xFF) {
         proximityEvent = true;
+        DEBUG("proximity:");
+    }
     else if (seq[0] != 0xFF)
         proximityEvent = false;
 
