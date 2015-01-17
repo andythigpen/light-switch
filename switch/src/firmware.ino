@@ -32,6 +32,7 @@ void setup() {
     touch.setReleaseThreshold(2);
 
     touch.sleep(SLEEP_ELECTRODES_OFF);
+    touch.dump();
 }
 
 void sleep(period_t time) {

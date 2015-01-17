@@ -143,6 +143,81 @@ TouchSequence::begin(byte electrodes, byte proximityMode)
     clear();
 }
 
+void
+TouchSequence::dump()
+{
+    // DEBUG("Registers: ");
+    // for (int i = 0; i < 0x7F; ++i) {
+    //     if (i % 8 == 0)
+    //         DEBUG_("0x0", i, " ");
+    //     DEBUG_FMT_(getRegister(i), HEX);
+    //     if (i % 8 == 7)
+    //         DEBUG();
+    //     else
+    //         DEBUG_(" ");
+    // }
+    DEBUG_("Touch status: ");
+    DEBUG_FMT_(getRegister(0), HEX);
+    DEBUG_(" ");
+    DEBUG_FMT(getRegister(1), HEX);
+
+    DEBUG("Filter status: ");
+    for (int i = 0x04; i < 0x1E; i += 2) {
+        DEBUG_FMT_((int)getRegister(i + 1) << 8 | getRegister(i), DEC);
+        DEBUG_(" ");
+    }
+    DEBUG("");
+
+    DEBUG("Baseline: ");
+    for (int i = 0x1E; i < 0x2B; ++i) {
+        DEBUG_FMT_(getRegister(i), DEC);
+        DEBUG_(" ");
+    }
+    DEBUG("");
+
+    DEBUG("Filters:");
+    for (int i = 0x2B; i < 0x41; ++i) {
+        DEBUG_FMT_(getRegister(i), HEX);
+        DEBUG_(" ");
+    }
+    DEBUG("");
+
+    DEBUG("Thresholds:");
+    for (int i = 0x41; i < 0x5B; ++i) {
+        DEBUG_FMT_(getRegister(i), HEX);
+        DEBUG_(" ");
+    }
+    DEBUG("");
+
+    DEBUG("Conf:");
+    for (int i = 0x5B; i < 0x5F; ++i) {
+        DEBUG_FMT_(getRegister(i), HEX);
+        DEBUG_(" ");
+    }
+    DEBUG("");
+
+    DEBUG("CDC:");
+    for (int i = 0x5F; i < 0x6C; ++i) {
+        DEBUG_FMT_(getRegister(i), HEX);
+        DEBUG_(" ");
+    }
+    DEBUG("");
+
+    DEBUG("CDT:");
+    for (int i = 0x6C; i < 0x72; ++i) {
+        DEBUG_FMT_(getRegister(i), HEX);
+        DEBUG_(" ");
+    }
+    DEBUG("");
+
+    DEBUG("AC:");
+    for (int i = 0x7B; i < 0x80; ++i) {
+        DEBUG_FMT_(getRegister(i), HEX);
+        DEBUG_(" ");
+    }
+    DEBUG("");
+}
+
 bool
 TouchSequence::setRegister(byte reg, byte val)
 {
@@ -150,13 +225,14 @@ TouchSequence::setRegister(byte reg, byte val)
 
     DEBUG_("setRegister: 0x");
     DEBUG_FMT_(reg, HEX);
-    DEBUG_(" : 0x");
-    DEBUG_FMT(val, HEX);
 
     Wire.beginTransmission(mpr121Addr);
     Wire.write(reg);
     Wire.write(val);
     errorCode = Wire.endTransmission();
+
+    DEBUG_(" : 0x");
+    DEBUG_FMT(val, HEX);
 
     // automatically update the running flag if ECR is set
     if (errorCode == 0 && reg == ECR) {
@@ -178,10 +254,10 @@ TouchSequence::getRegister(byte reg)
 
     byte val = Wire.read();
 
-    DEBUG_("getRegister: 0x");
-    DEBUG_FMT_(reg, HEX);
-    DEBUG_(" : 0x");
-    DEBUG_FMT(val, HEX);
+    // DEBUG_("getRegister: 0x");
+    // DEBUG_FMT_(reg, HEX);
+    // DEBUG_(" : 0x");
+    // DEBUG_FMT(val, HEX);
 
     return val;
 }

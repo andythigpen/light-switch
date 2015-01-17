@@ -103,6 +103,8 @@ class TouchSequence {
         void setTouchThreshold(byte val, byte ele=0xFF);
         void setReleaseThreshold(byte val, byte ele=0xFF);
 
+        void dump();
+
     protected:
         bool setRegister(byte reg, byte val);
         byte getRegister(byte reg);
