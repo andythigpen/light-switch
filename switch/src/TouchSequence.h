@@ -34,7 +34,7 @@ class TouchSequence {
         //                 NOTE: 0 for pin 2, 1 for pin 3
         TouchSequence(byte mpr121Addr, byte interruptPin);
 
-        // Initialize the TouchSequence instance, MPR121 library
+        // Initialize the TouchSequence instance, MPR121
         //   electrodes:    number of electrodes to enable (1-12, 0 = disabled)
         //   proximityMode: 0 = disabled
         //                  1 = electrodes 0-1
@@ -50,13 +50,12 @@ class TouchSequence {
         //  electrodes: directional electrodes used for gestures
         void setElectrodes(byte total, Electrodes &electrodes);
 
-        // shuts down everything but the proximity sensor to conserve power
-        // NOTE: if the proximity sensor is disabled, and no other external
-        //       interrupts or timers are enabled, this could cause the mcu
-        //       to sleep forever.
+        // conserves power by reducing the sampling rate, filter rate of
+        // the MPR121 to a lower level.
+        // once an event is detected wakeUp should be called if the sampling
+        // rate is too low to detect multiple events
         void sleep();
-        // bool isAsleep();
-        // re-enables electrodes
+        // resets the MPR121 sampling/filter rates to the defaults
         void wakeUp();
 
         // checks the sensors for any new inputs and adds them to the touch
@@ -66,7 +65,7 @@ class TouchSequence {
         bool update();
         // clears the current sequence
         // call this after you've handled a touch sequence and you want to
-        // start fresh
+        // start over fresh
         void clear();
 
         // returns true if MPR121 external interrupt is active
@@ -94,6 +93,11 @@ class TouchSequence {
 
         // returns true if any of the electrodes/proximity sensors are on
         bool isRunning();
+        // the default mode after calling begin()
+        // in run mode, the MPR121 is actively taking measurements
+        void run();
+        // in stop mode, the electrodes are off and the MPR121 can be configured
+        void stop();
 
         // updates the touch/release thresholds for the MPR121 sensor
         // val : range 0 - 255
@@ -102,23 +106,20 @@ class TouchSequence {
         void setTouchThreshold(byte val, byte ele=0xFF);
         void setReleaseThreshold(byte val, byte ele=0xFF);
 
+        // for debugging, prints out the registers of the MPR121
         void dump();
 
     protected:
-        friend class MPR121ConfigLock;
         bool setRegister(byte reg, byte val);
         byte getRegister(byte reg);
-        void run();
-        void stop();
 
         void applySettings(struct MPR121Settings&);
         void applyFilter(byte baseReg, struct MPR121Filter&);
+
         TouchGesture checkShortSwipe();
         TouchGesture checkLongSwipe();
         TouchGesture checkTap();
 
-        byte errorCode;
-        byte mpr121Addr;
         byte interruptPin;
         byte seq[MAX_TOUCH_SEQ];
         byte idx;
@@ -128,7 +129,9 @@ class TouchSequence {
 
         bool running;
         SleepMode sleepMode;
+
         struct {
+            byte address;
             union {
                 byte ecr;
                 struct {

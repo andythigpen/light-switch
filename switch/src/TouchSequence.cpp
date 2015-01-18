@@ -1,85 +1,12 @@
 #include "TouchSequence.h"
-//#include "MPR121.h"
 #include <Wire.h>
 #include "MPR121_registers.h"
+#include "MPR121_conf.h"
+#include "debug.h"
 
-#define DEBUG_TOUCH
-
-#if defined(DEBUG_TOUCH)
-#include "cpp_magic.h"
-
-#define _DEBUG_PRINT(x)     Serial.print(x);
-#define _DEBUG_IT(x, next)  _DEBUG_PRINT(x)
-#define _DEBUG_LAST(x)      Serial.println(x);
-#define DEBUG(...) \
-    do { \
-        MAP_SLIDE(_DEBUG_IT, _DEBUG_LAST, EMPTY, __VA_ARGS__) \
-    } while(0)
-#define DEBUG_(...) do { MAP(_DEBUG_PRINT, EMPTY, __VA_ARGS__) } while(0)
-#define DEBUG_FMT(a, b) do { Serial.println(a, b); } while(0)
-#define DEBUG_FMT_(a, b) do { Serial.print(a, b); } while(0)
-
-#else
-
-#define DEBUG(...) do { } while (0)
-#define DEBUG_(...) do { } while (0)
-#define DEBUG_FMT(...) do { } while (0)
-#define DEBUG_FMT_(...) do { } while (0)
-
-#endif
-
-struct MPR121Filter {
-    byte mhd;
-    byte nhd;
-    byte ncl;
-    byte fdl;
-};
-
-struct MPR121FilterGroup {
-    MPR121Filter rising;
-    MPR121Filter falling;
-    MPR121Filter touched;
-};
-
-struct MPR121Settings {
-    // filter configuration
-    struct MPR121FilterGroup electrode;
-    struct MPR121FilterGroup proximity;
-
-    // debounce settings
-    byte debounce;
-
-    // configuration registers
-    byte afe1;
-    byte afe2;
-
-    // auto-configuration registers
-    byte accr0;
-    byte accr1;
-    byte usl;
-    byte lsl;
-    byte tl;
-
-    MPR121Settings() :
-        debounce(0x11),
-        afe1(0x3F),
-        afe2(0x24),
-        accr0(0x3F),
-        accr1(0x00),
-        usl(200),
-        lsl(100),
-        tl(180)
-    {
-        electrode.rising  = (MPR121Filter){ 0x3F, 0x3F, 0x05, 0x00 };
-        electrode.falling = (MPR121Filter){ 0x01, 0x3F, 0x10, 0x03 };
-        electrode.touched = (MPR121Filter){ 0x00, 0x01, 0x01, 0xFF };
-        proximity.rising  = (MPR121Filter){ 0x0F, 0x0F, 0x00, 0x00 };
-        proximity.falling = (MPR121Filter){ 0x01, 0x01, 0xFF, 0xFF };
-        proximity.touched = (MPR121Filter){ 0x00, 0x00, 0x00, 0x00 };
-    }
-};
 struct MPR121Settings defaultSettings;
 
+// make sure that the MPR121 is stopped when configuring registers
 struct MPR121ConfigLock {
     MPR121ConfigLock(TouchSequence *inst, bool acquireImmediately=true) :
         shouldLock(false), inst(inst)
@@ -104,7 +31,7 @@ struct MPR121ConfigLock {
     TouchSequence *inst;
 };
 
-
+// Interrupt handlers
 static void wakeUpInt0() {
     detachInterrupt(0);
 }
@@ -113,10 +40,15 @@ static void wakeUpInt1() {
     detachInterrupt(1);
 }
 
+// ===============
+//  TouchSequence
+// ===============
+
 TouchSequence::TouchSequence(byte mpr121Addr, byte interruptPin) :
-    mpr121Addr(mpr121Addr), interruptPin(interruptPin), idx(0),
+    interruptPin(interruptPin), idx(0),
     proximityEvent(false), running(false), sleepMode(HIGH_SAMPLING_MODE)
 {
+    mpr121.address    = mpr121Addr;
     electrodes.top    = ELECTRODE_TOP;
     electrodes.left   = ELECTRODE_LEFT;
     electrodes.bottom = ELECTRODE_BOTTOM;
@@ -134,10 +66,9 @@ TouchSequence::begin(byte electrodes, byte proximityMode)
     mpr121.eleprox_en = proximityMode & 0x03;
     mpr121.cl = 2;
 
-    MPR121Settings defaults;
-    applySettings(defaults);
-    setTouchThreshold(10);
-    setReleaseThreshold(5);
+    applySettings(defaultSettings);
+    setTouchThreshold(defaultSettings.touch);
+    setReleaseThreshold(defaultSettings.release);
 
     // start in run mode
     run();
@@ -150,16 +81,17 @@ TouchSequence::begin(byte electrodes, byte proximityMode)
 void
 TouchSequence::dump()
 {
-    // DEBUG("Registers: ");
-    // for (int i = 0; i < 0x7F; ++i) {
-    //     if (i % 8 == 0)
-    //         DEBUG_("0x0", i, " ");
-    //     DEBUG_FMT_(getRegister(i), HEX);
-    //     if (i % 8 == 7)
-    //         DEBUG();
-    //     else
-    //         DEBUG_(" ");
-    // }
+    DEBUG("Registers: ");
+    for (int i = 0; i < 0x7F; ++i) {
+        if (i % 8 == 0)
+            DEBUG_("0x0", i, " ");
+        DEBUG_FMT_(getRegister(i), HEX);
+        if (i % 8 == 7)
+            DEBUG();
+        else
+            DEBUG_(" ");
+    }
+#if 0
     DEBUG_("Touch status: ");
     DEBUG_FMT_(getRegister(0), HEX);
     DEBUG_(" ");
@@ -220,6 +152,7 @@ TouchSequence::dump()
         DEBUG_(" ");
     }
     DEBUG("");
+#endif
 }
 
 bool
@@ -230,10 +163,10 @@ TouchSequence::setRegister(byte reg, byte val)
     DEBUG_("setRegister: 0x");
     DEBUG_FMT_(reg, HEX);
 
-    Wire.beginTransmission(mpr121Addr);
+    Wire.beginTransmission(mpr121.address);
     Wire.write(reg);
     Wire.write(val);
-    errorCode = Wire.endTransmission();
+    byte errorCode = Wire.endTransmission();
 
     DEBUG_(" : 0x");
     DEBUG_FMT(val, HEX);
@@ -241,7 +174,7 @@ TouchSequence::setRegister(byte reg, byte val)
     // automatically update the running flag if ECR is set
     if (errorCode == 0 && reg == ECR) {
         running = val & 0x3F;
-        DEBUG("setRegister:", running ? " running" : " not running");
+        DEBUG("setRegister: ", running ? "running" : "not running");
     }
 
     return errorCode == 0;
@@ -250,20 +183,12 @@ TouchSequence::setRegister(byte reg, byte val)
 byte
 TouchSequence::getRegister(byte reg)
 {
-    Wire.beginTransmission(mpr121Addr);
+    Wire.beginTransmission(mpr121.address);
     Wire.write(reg);
     Wire.endTransmission(false);
-    Wire.requestFrom(mpr121Addr, (byte)1);
-    errorCode = Wire.endTransmission();
-
-    byte val = Wire.read();
-
-    // DEBUG_("getRegister: 0x");
-    // DEBUG_FMT_(reg, HEX);
-    // DEBUG_(" : 0x");
-    // DEBUG_FMT(val, HEX);
-
-    return val;
+    Wire.requestFrom(mpr121.address, (byte)1);
+    Wire.endTransmission();
+    return Wire.read();
 }
 
 void
@@ -368,10 +293,9 @@ TouchSequence::wakeUp()
 void
 TouchSequence::stop()
 {
+    DEBUG("stop:");
     if (!running)
         return;
-    DEBUG_("stop: setting ECR register to: ");
-    DEBUG_FMT(mpr121.ecr & 0xC0, HEX);
     // mask the lower bits to turn proximity/touch electrodes off
     setRegister(ECR, mpr121.ecr & 0xC0);
 }
@@ -385,11 +309,10 @@ TouchSequence::isRunning()
 void
 TouchSequence::run()
 {
-    // if (running)
-        // return;
+    DEBUG("run:");
+    if (running)
+        return;
     // restore the current configuration
-    DEBUG_("run: setting ECR register to: ");
-    DEBUG_FMT(mpr121.ecr, HEX);
     setRegister(ECR, mpr121.ecr);
 }
 
@@ -398,6 +321,7 @@ TouchSequence::update()
 {
     DEBUG("update:");
     int prevTouchedState = mpr121.touched.all;
+
     // clears the interrupt
     mpr121.touched.status[0] = getRegister(ELE0_7);
     mpr121.touched.status[1] = getRegister(ELE8_PROX);
@@ -428,7 +352,7 @@ TouchSequence::update()
     else if (seq[0] != 0xFF)
         proximityEvent = false;
 
-    return mpr121.touched.all & 0x1FF;
+    return isTouched();;
 }
 
 void
@@ -516,7 +440,7 @@ TouchSequence::getGesture()
     for (int i = 0; i < MAX_TOUCH_SEQ; ++i) {
         DEBUG_(seq[i], ' ');
     }
-    DEBUG();
+    DEBUG("");
 
     TouchGesture gesture;
     if ((gesture = checkShortSwipe()) != TOUCH_UNKNOWN)

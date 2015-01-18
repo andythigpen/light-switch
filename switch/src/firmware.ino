@@ -59,7 +59,7 @@ void sleep(period_t time) {
         LowPower.powerDown(time, ADC_OFF, BOD_OFF);
     }
     else
-        LowPower.powerExtStandby(time, ADC_OFF, BOD_OFF, TIMER2_OFF);
+        LowPower.powerStandby(time, ADC_OFF, BOD_OFF);
 }
 
 /* Sends a touch event to the base station */
@@ -115,9 +115,6 @@ void loop() {
         else if (touch.isProximity()) {
             Serial.println("proximity event: ");
             sleepPeriod = SLEEP_2S;
-            // if (touch.wasAsleep()) {
-            //    touch.wakeUp();
-            // }
         }
         else {
             Serial.print("release event: ");
