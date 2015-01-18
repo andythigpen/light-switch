@@ -37,6 +37,10 @@ void setup() {
     touch.setTouchThreshold(5);
     touch.setReleaseThreshold(2);
 
+    // proximity thresholds
+    touch.setTouchThreshold(2, 12);
+    touch.setReleaseThreshold(1, 12);
+
     touch.sleep();
     touch.dump();
 }
