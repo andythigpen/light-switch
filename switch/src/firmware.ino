@@ -37,7 +37,7 @@ void setup() {
     touch.setTouchThreshold(5);
     touch.setReleaseThreshold(2);
 
-    touch.sleep(SLEEP_ELECTRODES_OFF);
+    touch.sleep();
     touch.dump();
 }
 
@@ -45,13 +45,17 @@ void sleep(period_t time) {
     touch.enableInterrupt();
 
     // flush serial for debugging before powering down
+    delay(100);
     Serial.flush();
 
     // turn off the wdt in case it was previously set...this is to prevent a
     // spurious wakeup after an interrupt and then sleep forever call.
-    if (time == SLEEP_FOREVER)
+    if (time == SLEEP_FOREVER) {
         wdt_disable();
-    LowPower.powerDown(time, ADC_OFF, BOD_OFF);
+        LowPower.powerDown(time, ADC_OFF, BOD_OFF);
+    }
+    else
+        LowPower.powerExtStandby(time, ADC_OFF, BOD_OFF, TIMER2_OFF);
 }
 
 /* Sends a touch event to the base station */
@@ -108,7 +112,7 @@ void loop() {
             Serial.println("proximity event: ");
             sleepPeriod = SLEEP_2S;
             // if (touch.wasAsleep()) {
-                touch.wakeUp();
+            //    touch.wakeUp();
             // }
         }
         else {
@@ -116,6 +120,7 @@ void loop() {
             Serial.println(touch.getLastTouch());
             sleepPeriod = SLEEP_250MS;
         }
+        touch.wakeUp();
     }
     else if (touch.isTouched() || touch.isProximity()) {
         // we woke up w/o an interrupt, but there was a previous
@@ -130,7 +135,7 @@ void loop() {
         // clear everything to reset.
         handleEvent(0);
         touch.clear();
-        touch.sleep(SLEEP_ELECTRODES_OFF);
+        touch.sleep();
         Serial.println("Sleeping forever");
         Serial.println();
         sleepPeriod = SLEEP_FOREVER;

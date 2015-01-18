@@ -22,9 +22,8 @@ struct Electrodes {
 };
 
 enum SleepMode {
-    SLEEP_ELECTRODES_OFF,
-    SLEEP_PROXIMITY_OFF,
-    SLEEP_ALL_OFF
+    LOW_POWER_MODE,
+    HIGH_SAMPLING_MODE,
 };
 
 class TouchSequence {
@@ -55,7 +54,7 @@ class TouchSequence {
         // NOTE: if the proximity sensor is disabled, and no other external
         //       interrupts or timers are enabled, this could cause the mcu
         //       to sleep forever.
-        void sleep(SleepMode mode);
+        void sleep();
         // bool isAsleep();
         // re-enables electrodes
         void wakeUp();
@@ -106,10 +105,11 @@ class TouchSequence {
         void dump();
 
     protected:
+        friend class MPR121ConfigLock;
         bool setRegister(byte reg, byte val);
         byte getRegister(byte reg);
-        // void enterRunMode();
-        // void enterStopMode();
+        void run();
+        void stop();
 
         void applySettings(struct MPR121Settings&);
         void applyFilter(byte baseReg, struct MPR121Filter&);
@@ -127,6 +127,7 @@ class TouchSequence {
         struct Electrodes electrodes;
 
         bool running;
+        SleepMode sleepMode;
         struct {
             union {
                 byte ecr;

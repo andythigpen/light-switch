@@ -62,9 +62,9 @@ struct MPR121Settings {
 
     MPR121Settings() :
         debounce(0x11),
-        afe1(0xFF),
-        afe2(0x38),
-        accr0(0x00),
+        afe1(0x3F),
+        afe2(0x24),
+        accr0(0x3F),
         accr1(0x00),
         usl(200),
         lsl(100),
@@ -78,6 +78,7 @@ struct MPR121Settings {
         proximity.touched = (MPR121Filter){ 0x00, 0x00, 0x00, 0x00 };
     }
 };
+struct MPR121Settings defaultSettings;
 
 struct MPR121ConfigLock {
     MPR121ConfigLock(TouchSequence *inst, bool acquireImmediately=true) :
@@ -92,18 +93,17 @@ struct MPR121ConfigLock {
     void acquire() {
         shouldLock = inst->isRunning();
         if (shouldLock)
-            inst->sleep(SLEEP_ALL_OFF);
+            inst->stop();
     }
     void release() {
         if (shouldLock)
-            inst->wakeUp();
+            inst->run();
         shouldLock = false;
     }
     bool shouldLock;
     TouchSequence *inst;
 };
 
-static struct MPR121Settings defaultSettings;
 
 static void wakeUpInt0() {
     detachInterrupt(0);
@@ -115,7 +115,7 @@ static void wakeUpInt1() {
 
 TouchSequence::TouchSequence(byte mpr121Addr, byte interruptPin) :
     mpr121Addr(mpr121Addr), interruptPin(interruptPin), idx(0),
-    proximityEvent(false), running(false)
+    proximityEvent(false), running(false), sleepMode(HIGH_SAMPLING_MODE)
 {
     electrodes.top    = ELECTRODE_TOP;
     electrodes.left   = ELECTRODE_LEFT;
@@ -138,9 +138,13 @@ TouchSequence::begin(byte electrodes, byte proximityMode)
     applySettings(defaults);
     setTouchThreshold(10);
     setReleaseThreshold(5);
+
     // start in run mode
-    wakeUp();
+    run();
     clear();
+
+    // turn off auto configure after the initial register values have loaded
+    setRegister(ACCR0, 0);
 }
 
 void
@@ -221,7 +225,7 @@ TouchSequence::dump()
 bool
 TouchSequence::setRegister(byte reg, byte val)
 {
-    MPR121ConfigLock lock(this, reg != ECR && reg < 0x72);
+    MPR121ConfigLock lock(this, reg != ECR && (reg < 0x72 || reg > 0x7A));
 
     DEBUG_("setRegister: 0x");
     DEBUG_FMT_(reg, HEX);
@@ -334,28 +338,43 @@ TouchSequence::setElectrodes(byte total, struct Electrodes &electrodes)
 }
 
 void
-TouchSequence::sleep(SleepMode mode)
+TouchSequence::sleep()
+{
+#if 0
+    DEBUG("sleep:");
+    if (sleepMode == LOW_POWER_MODE)
+        return;
+    MPR121ConfigLock lock(this);
+    //setRegister(AFE1, 0x3F);
+    setRegister(AFE2, 0x25);
+    sleepMode = LOW_POWER_MODE;
+#endif
+}
+
+void
+TouchSequence::wakeUp()
+{
+#if 0
+    DEBUG("wakeUp:");
+    if (sleepMode != LOW_POWER_MODE)
+        return;
+    MPR121ConfigLock lock(this);
+    //setRegister(AFE1, 0xFF);
+    setRegister(AFE2, 0x38);
+    sleepMode = HIGH_SAMPLING_MODE;
+#endif
+}
+
+void
+TouchSequence::stop()
 {
     if (!running)
         return;
-    byte mask;
-    switch (mode) {
-        case SLEEP_ELECTRODES_OFF:  mask = 0xF0; break;
-        case SLEEP_PROXIMITY_OFF:   mask = 0xCF; break;
-        case SLEEP_ALL_OFF:         mask = 0xC0; break;
-    }
-    DEBUG_("sleep: setting ECR register to: ");
-    DEBUG_FMT(mpr121.ecr & mask, HEX);
+    DEBUG_("stop: setting ECR register to: ");
+    DEBUG_FMT(mpr121.ecr & 0xC0, HEX);
     // mask the lower bits to turn proximity/touch electrodes off
-    setRegister(ECR, mpr121.ecr & mask);
+    setRegister(ECR, mpr121.ecr & 0xC0);
 }
-
-// bool
-// TouchSequence::wasAsleep()
-// {
-//     //TODO:
-//     return false;
-// }
 
 bool
 TouchSequence::isRunning()
@@ -364,12 +383,12 @@ TouchSequence::isRunning()
 }
 
 void
-TouchSequence::wakeUp()
+TouchSequence::run()
 {
     // if (running)
         // return;
     // restore the current configuration
-    DEBUG_("wakeUp: setting ECR register to: ");
+    DEBUG_("run: setting ECR register to: ");
     DEBUG_FMT(mpr121.ecr, HEX);
     setRegister(ECR, mpr121.ecr);
 }
@@ -383,22 +402,23 @@ TouchSequence::update()
     mpr121.touched.status[0] = getRegister(ELE0_7);
     mpr121.touched.status[1] = getRegister(ELE8_PROX);
 
+    // test to see if there was a change
+    if (!(prevTouchedState ^ mpr121.touched.all))
+        return isTouched();
+
     for (byte i = 0; i < mpr121.ele_en; ++i) {
-        if (!isTouched(i))
-            continue;
-        // test to see if there was a change
-        if (prevTouchedState ^ mpr121.touched.all) {
-            if (mpr121.touched.all & (1 << i)) {
+        if (isTouched(i)) {
+            if (prevTouchedState & (1 << i))
+                DEBUG("repeat: ", i);
+            else {
                 DEBUG("touch: ", i);
                 seq[idx++] = i;
                 if (idx >= MAX_TOUCH_SEQ)
                     idx = MAX_TOUCH_SEQ;
             }
-            else
-                DEBUG("release: ", i);
         }
-        else
-            DEBUG("repeat: ", i);
+        else if (prevTouchedState & (1 << i))
+            DEBUG("release: ", i);
     }
 
     if (mpr121.touched.eleprox && seq[0] == 0xFF) {
