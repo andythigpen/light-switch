@@ -1,5 +1,5 @@
-#ifndef TOUCHPROTOCOL_H
-#define TOUCHPROTOCOL_H
+#ifndef SWITCHPROTOCOL_H
+#define SWITCHPROTOCOL_H
 
 enum TouchGesture {
     TOUCH_UNKNOWN,
@@ -21,17 +21,40 @@ enum Electrode {
     ELECTRODE_PROXIMITY = 12,
 };
 
-enum PacketType {
-    PKT_TOUCH_EVENT,
-    PKT_STATUS_UPDATE,
+
+struct SwitchPacket {
+    SwitchPacket(unsigned char type) : type(type) {}
+    enum PacketType {
+        TOUCH_EVENT,
+        STATUS_UPDATE,
+        RESET,
+        CONFIGURE,
+    };
+    unsigned char type;
 };
 
-struct TouchEvent {
-    TouchEvent() : type(PKT_TOUCH_EVENT) {}
-    unsigned char type;
+struct TouchEvent : SwitchPacket {
+    TouchEvent() : SwitchPacket(TOUCH_EVENT) {}
     unsigned char gesture;
     unsigned char electrode;
     unsigned char repeat;
 };
 
-#endif // TOUCHPROTOCOL_H
+struct SwitchStatus : SwitchPacket {
+    SwitchStatus() : SwitchPacket(STATUS_UPDATE) {}
+    long batteryLevel;
+};
+
+struct SwitchReset : SwitchPacket {
+    SwitchReset() : SwitchPacket(RESET) {}
+    unsigned char hardReset;
+};
+
+struct SwitchConfigure : SwitchPacket {
+    SwitchConfigure() : SwitchPacket(CONFIGURE) {}
+    //TODO: use MPR121Settings here instead
+    unsigned char touchThreshold;
+    unsigned char releaseThreshold;
+};
+
+#endif // SWITCHPROTOCOL_H
