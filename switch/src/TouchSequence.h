@@ -7,11 +7,29 @@
   #include <WProgram.h> // Arduino 0022
 #endif
 
-#include "TouchProtocol.h"
-
 #ifndef MAX_TOUCH_SEQ
 #define MAX_TOUCH_SEQ 4
 #endif
+
+enum TouchGesture {
+    TOUCH_UNKNOWN,
+    TOUCH_TAP,
+    TOUCH_DOUBLE_TAP,
+    TOUCH_SWIPE_UP,
+    TOUCH_SWIPE_DOWN,
+    TOUCH_SWIPE_LEFT,
+    TOUCH_SWIPE_RIGHT,
+    TOUCH_PROXIMITY,
+};
+
+enum ElectrodeType {
+    ELECTRODE_TOP,
+    ELECTRODE_LEFT,
+    ELECTRODE_BOTTOM,
+    ELECTRODE_RIGHT,
+    ELECTRODE_CENTER,
+    ELECTRODE_PROXIMITY = 12,
+};
 
 struct Electrodes {
     byte top;

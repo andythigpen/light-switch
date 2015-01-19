@@ -5,6 +5,7 @@
 #include "LowPower.h"
 #include "TouchSequence.h"
 #include "RFM12B.h"
+#include "SwitchProtocol.h"
 
 #define NODEID      2
 #define NETWORKID   1
