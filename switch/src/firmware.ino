@@ -20,33 +20,7 @@ RFM12B radio;
 TouchSequence touch(mpr121Addr, mpr121IntPin);
 period_t sleepPeriod = SLEEP_FOREVER;
 
-void setup() {
-    // initialize serial
-    Serial.begin(115200);
-    while (!Serial);
-    Serial.println("initializing...");
-
-    // D5 GND for electrodes
-    //pinMode(5, OUTPUT);
-    //digitalWrite(5, LOW);
-
-    Serial.println("  * radio...");
-    radio.Initialize(NODEID, RF12_915MHZ, NETWORKID);
-    /* radio.Encrypt(KEY); */
-    radio.Sleep(); // sleep right away to save power
-
-    Serial.println("  * touch sensor...");
-    touch.begin(5, 2);
-    touch.setTouchThreshold(5);
-    touch.setReleaseThreshold(2);
-
-    // proximity thresholds
-    touch.setTouchThreshold(2, 12);
-    touch.setReleaseThreshold(1, 12);
-
-    touch.sleep();
-    touch.dump();
-}
+extern long readVcc();
 
 void sleep(period_t time) {
     touch.enableInterrupt();
@@ -102,6 +76,34 @@ void handleEvent(byte repeated) {
     radio.Wakeup();
     radio.Send(GATEWAYID, (const void*)(&pkt), sizeof(pkt), false);
     radio.Sleep();
+}
+
+void setup() {
+    // initialize serial
+    Serial.begin(115200);
+    while (!Serial);
+    Serial.println("initializing...");
+
+    // D5 GND for electrodes
+    //pinMode(5, OUTPUT);
+    //digitalWrite(5, LOW);
+
+    Serial.println("  * radio...");
+    radio.Initialize(NODEID, RF12_915MHZ, NETWORKID);
+    /* radio.Encrypt(KEY); */
+    radio.Sleep(); // sleep right away to save power
+
+    Serial.println("  * touch sensor...");
+    touch.begin(5, 2);
+    touch.setTouchThreshold(5);
+    touch.setReleaseThreshold(2);
+
+    // proximity thresholds
+    touch.setTouchThreshold(2, 12);
+    touch.setReleaseThreshold(1, 12);
+
+    touch.sleep();
+    touch.dump();
 }
 
 void loop() {
