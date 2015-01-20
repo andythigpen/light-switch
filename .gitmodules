@@ -1,6 +1,3 @@
-[submodule "lib/MPR121"]
-	path = lib/MPR121
-	url = https://github.com/BareConductive/mpr121.git
 [submodule "lib/LowPower"]
 	path = lib/LowPower
 	url = https://github.com/rocketscream/Low-Power.git
