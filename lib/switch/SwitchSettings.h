@@ -41,7 +41,7 @@ struct SleepSettings {
     SleepSettings() :
         touch(SLEEP_500MS),
         release(SLEEP_250MS),
-        proximity(SLEEP_2S),
+        proximity(SLEEP_1S),
         repeat(SLEEP_250MS),
         wakeUpInterval(150),    // 150 * 2^11 = 307,200 ms ~= 5min
         wakeUpScaler(11)
