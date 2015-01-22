@@ -29,8 +29,6 @@ period_t sleepPeriod = SLEEP_FOREVER;
 extern long readVcc();
 
 void sleep(period_t time) {
-    touch.enableInterrupt();
-
     // flush serial for debugging before powering down
     delay(100);
     Serial.flush();
@@ -145,12 +143,15 @@ void setup() {
     touch.setTouchThreshold(2, 12);
     touch.setReleaseThreshold(1, 12);
 
+    touch.enableInterrupt();
     touch.sleep();
     touch.dump();
 }
 
 void loop() {
-    sleep(sleepPeriod);
+    if (!touch.isInterrupted())
+        sleep(sleepPeriod);
+
     if (radio.DidTimeOut())
         sendStatus();
 
@@ -172,6 +173,7 @@ void loop() {
             sleepPeriod = (period_t)sleepSettings.release;
         }
         touch.wakeUp();
+        touch.enableInterrupt();
     }
     else if (touch.isTouched() || touch.isProximity()) {
         // we woke up w/o an interrupt, but there was a previous
