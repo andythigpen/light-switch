@@ -6,12 +6,8 @@
 #include "RFM12B.h"
 
 // current version of the firmware
-#define FIRMWARE_VERSION 1
-
-// settings mask
-#define SETTINGS_MPR121 0x01
-#define SETTINGS_RFM12B 0x02
-#define SETTINGS_SLEEP  0x04
+#define FIRMWARE_MAJOR_VERSION  0
+#define FIRMWARE_MINOR_VERSION  1
 
 // RFM12B default settings
 #define GATEWAYID           1
@@ -65,6 +61,16 @@ struct RFM12BSettings {
         lowVoltageThreshold(RF12_2v75)
     {
     }
+};
+
+struct SwitchSettings {
+    struct Header {
+        byte major;
+        byte minor;
+    } header;
+    RFM12BSettings rfm12b;
+    MPR121Settings mpr121;
+    SleepSettings sleep;
 };
 
 #endif // SWITCH_SETTINGS_H

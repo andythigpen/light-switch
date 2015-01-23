@@ -95,7 +95,7 @@ void loop() {
             }
 
             if (radio.ACKRequested()) {
-                SwitchPacket ping(SwitchPacket::PING);
+                SwitchPacket ping(SwitchPacket::PING, sizeof(SwitchPacket));
                 Serial.println("ack:");
                 radio.SendACK((void *)&ping, sizeof(ping));
                 // radio.SendACK();

@@ -30,3 +30,9 @@ int loadSettings(int offset, T &dest)
     else
         Serial.println("failed to load settings");
 }
+
+template <class T>
+void writeSettings(int offset, T &src)
+{
+    return EEPROM_writeAnything(offset, src);
+}

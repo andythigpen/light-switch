@@ -2,42 +2,54 @@
 #define SWITCHPROTOCOL_H
 
 struct SwitchPacket {
-    SwitchPacket(unsigned char type) : type(type) {}
+    SwitchPacket(unsigned char type, unsigned char len) :
+        type(type), len(len) {}
     enum PacketType {
         TOUCH_EVENT,
         STATUS_UPDATE,
         RESET,
-        CONFIGURE,
+        CONFIGURE_SLEEP,
+        CONFIGURE_MPR121,
+        CONFIGURE_RFM12B,
         PING,
     };
     unsigned char type;
+    unsigned char len;
 };
 
 struct TouchEvent : SwitchPacket {
-    TouchEvent() : SwitchPacket(TOUCH_EVENT) {}
+    TouchEvent() : SwitchPacket(TOUCH_EVENT, sizeof(TouchEvent)) {}
     unsigned char gesture;
     unsigned char electrode;
     unsigned char repeat;
 };
 
-//TODO: add a version number to this packet?
-//      no need to send it every time...maybe add another packet type that gets
-//      sent on startup with version, and request for settings?
 struct SwitchStatus : SwitchPacket {
-    SwitchStatus() : SwitchPacket(STATUS_UPDATE) {}
+    SwitchStatus() : SwitchPacket(STATUS_UPDATE, sizeof(SwitchStatus)) {}
     long batteryLevel;
 };
 
 struct SwitchReset : SwitchPacket {
-    SwitchReset() : SwitchPacket(RESET) {}
-    unsigned char hardReset;
+    SwitchReset() : SwitchPacket(RESET, sizeof(SwitchReset)) {}
+    unsigned char resetSettings;
 };
 
-struct SwitchConfigure : SwitchPacket {
-    SwitchConfigure() : SwitchPacket(CONFIGURE) {}
-    //TODO: use MPR121Settings here instead
-    unsigned char touchThreshold;
-    unsigned char releaseThreshold;
+struct SwitchConfigureSleep : SwitchPacket {
+    SwitchConfigureSleep() :
+        SwitchPacket(CONFIGURE_SLEEP, sizeof(SwitchConfigureSleep)) {}
+    SleepSettings settings;
+};
+
+struct SwitchConfigureMPR121 : SwitchPacket {
+    SwitchConfigureMPR121() :
+        SwitchPacket(CONFIGURE_MPR121, sizeof(SwitchConfigureMPR121)) {}
+    MPR121Settings settings;
+};
+
+struct SwitchConfigureRFM12B : SwitchPacket {
+    SwitchConfigureRFM12B() :
+        SwitchPacket(CONFIGURE_RFM12B, sizeof(SwitchConfigureRFM12B)) {}
+    RFM12BSettings settings;
 };
 
 #endif // SWITCHPROTOCOL_H

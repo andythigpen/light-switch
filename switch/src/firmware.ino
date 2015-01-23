@@ -46,25 +46,90 @@ void sleep(period_t time) {
         LowPower.powerStandby(time, ADC_OFF, BOD_OFF);
 }
 
+void loadConfiguration() {
+    SwitchSettings::Header firmware;
+    EEPROM_readAnything(0, firmware);
+    if (firmware.major != FIRMWARE_MAJOR_VERSION ||
+        firmware.minor != FIRMWARE_MINOR_VERSION) {
+        Serial.println("loadConfiguration: no configuration");
+        return;
+    }
+
+    EEPROM_readAnything(offsetof(SwitchSettings, mpr121), mpr121Settings);
+    EEPROM_readAnything(offsetof(SwitchSettings, rfm12b), rfm12bSettings);
+    EEPROM_readAnything(offsetof(SwitchSettings, sleep), sleepSettings);
+}
+
+void saveConfiguration() {
+    SwitchSettings::Header firmware;
+    EEPROM_readAnything(0, firmware);
+    if (firmware.major != FIRMWARE_MAJOR_VERSION ||
+        firmware.minor != FIRMWARE_MINOR_VERSION) {
+        firmware.major = FIRMWARE_MAJOR_VERSION;
+        firmware.minor = FIRMWARE_MINOR_VERSION;
+        EEPROM_writeAnything(0, firmware);
+    }
+    EEPROM_writeAnything(offsetof(SwitchSettings, mpr121), mpr121Settings);
+    EEPROM_writeAnything(offsetof(SwitchSettings, rfm12b), rfm12bSettings);
+    EEPROM_writeAnything(offsetof(SwitchSettings, sleep), sleepSettings);
+}
+
 void handleReply() {
     Serial.println("handleReply: ");
-    if (*radio.DataLen == 0)
-        return;
-    unsigned char type = *(unsigned char *)radio.Data;
-    switch (type) {
-        case SwitchPacket::PING:
-            Serial.println("ping");
-            break;
-        case SwitchPacket::CONFIGURE:
-            Serial.println("configure");
-            break;
-        case SwitchPacket::RESET:
-            Serial.println("reset");
-            break;
-        default:
-            Serial.print("Unknown type: ");
-            Serial.println(type);
-            break;
+    // unsigned char type = *(unsigned char *)radio.Data;
+    // unsigned char len = *(((unsigned char *)radio.Data) + 1);
+    unsigned char *data = (unsigned char *)radio.Data;
+    unsigned char offset = 0;
+    bool settingsChanged = false;
+    while (offset < *radio.DataLen) {
+        SwitchPacket *header = (SwitchPacket *)(data + offset);
+        switch (header->type) {
+            case SwitchPacket::PING:
+                Serial.println("ping");
+                break;
+            case SwitchPacket::CONFIGURE_MPR121: {
+                Serial.println("configure mpr121");
+                SwitchConfigureMPR121 *pkt = (SwitchConfigureMPR121 *)header;
+                mpr121Settings = pkt->settings;
+                settingsChanged = true;
+                break;
+            }
+            case SwitchPacket::CONFIGURE_SLEEP: {
+                Serial.println("configure sleep");
+                SwitchConfigureSleep *pkt = (SwitchConfigureSleep *)header;
+                sleepSettings = pkt->settings;
+                settingsChanged = true;
+                break;
+            }
+            case SwitchPacket::CONFIGURE_RFM12B: {
+                Serial.println("configure rfm12b");
+                SwitchConfigureRFM12B *pkt = (SwitchConfigureRFM12B *)header;
+                rfm12bSettings = pkt->settings;
+                settingsChanged = true;
+                break;
+            }
+            case SwitchPacket::RESET: {
+                Serial.println("reset");
+                SwitchReset *pkt = (SwitchReset *)header;
+                if (pkt->resetSettings) {
+                    Serial.println("resetting settings");
+                    EEPROM_writeAnything(0, 255);
+                }
+                // soft-reset
+                wdt_enable(WDTO_15MS);
+                while (1);
+                break;
+            }
+            default:
+                Serial.print("Unknown type: ");
+                Serial.println(header->type);
+                break;
+        }
+        offset += header->len;
+    }
+
+    if (settingsChanged) {
+        saveConfiguration();
     }
 }
 
@@ -119,26 +184,6 @@ void sendStatus() {
     radio.Wakeup();
     radio.Send(GATEWAYID, (const void*)(&pkt), sizeof(pkt), false);
     radio.Sleep(sleepSettings.statusInterval, sleepSettings.statusScaler);
-}
-
-void loadConfiguration() {
-    int offset = 0;
-    if (EEPROM.read(offset++) != FIRMWARE_VERSION)
-        return;
-
-    // second byte bitmask indicating which settings are set
-    byte enabled = EEPROM.read(offset++);
-    if (enabled & SETTINGS_MPR121)
-        loadSettings(offset, mpr121Settings);
-    offset += sizeof(MPR121Settings);
-
-    if (enabled & SETTINGS_RFM12B)
-        loadSettings(offset, rfm12bSettings);
-    offset += sizeof(RFM12BSettings);
-
-    if (enabled & SETTINGS_SLEEP)
-        loadSettings(offset, sleepSettings);
-    offset += sizeof(SleepSettings);
 }
 
 void setup() {
