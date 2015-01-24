@@ -23,10 +23,16 @@ void setup() {
     while (!Serial);
     Serial.println("initializing...");
 
+    // D5 GND for electrodes
+    //pinMode(5, OUTPUT);
+    //digitalWrite(5, LOW);
+
+    Serial.println("  * radio...");
     radio.Initialize(NODEID, RF12_915MHZ, NETWORKID);
     /* radio.Encrypt(KEY); */
     radio.Sleep(); // sleep right away to save power
 
+    Serial.println("  * touch sensor...");
     touch.begin(5, 2);
     touch.setTouchThreshold(5);
     touch.setReleaseThreshold(2);
