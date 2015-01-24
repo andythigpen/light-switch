@@ -12,7 +12,7 @@ RFM12B radio;
 #define ACK_TIME    30  // # of ms to wait for an ack
 
 void setup() {
-    Serial.begin(57600);
+    Serial.begin(115200);
     while (!Serial);
 
     radio.Initialize(NODEID, FREQUENCY, NETWORKID);
