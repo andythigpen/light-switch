@@ -96,13 +96,18 @@ class TouchSequence {
         // returns true if any of the electrodes/proximity sensors are on
         bool isRunning();
 
+        // updates the touch/release thresholds for the MPR121 sensor
+        // val : range 0 - 255
+        // ele : # of the electrode to set, if > 13, then all electrodes are
+        //       set to val
+        void setTouchThreshold(byte val, byte ele=0xFF);
+        void setReleaseThreshold(byte val, byte ele=0xFF);
+
     protected:
         bool setRegister(byte reg, byte val);
         byte getRegister(byte reg);
         // void enterRunMode();
         // void enterStopMode();
-        void setTouchThreshold(byte val, byte reg=0xFF);
-        void setReleaseThreshold(byte val, byte reg=0xFF);
 
         void applySettings(struct MPR121Settings&);
         void applyFilter(byte baseReg, struct MPR121Filter&);

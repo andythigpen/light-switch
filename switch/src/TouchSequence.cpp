@@ -3,9 +3,30 @@
 #include <Wire.h>
 #include "MPR121_registers.h"
 
-
 #define DEBUG_TOUCH
-//TODO: add a debug macro for printing to serial port if DEBUG_TOUCH is defined
+
+#if defined(DEBUG_TOUCH)
+#include "cpp_magic.h"
+
+#define _DEBUG_PRINT(x)     Serial.print(x);
+#define _DEBUG_IT(x, next)  _DEBUG_PRINT(x)
+#define _DEBUG_LAST(x)      Serial.println(x);
+#define DEBUG(...) \
+    do { \
+        MAP_SLIDE(_DEBUG_IT, _DEBUG_LAST, EMPTY, __VA_ARGS__) \
+    } while(0)
+#define DEBUG_(...) do { MAP(_DEBUG_PRINT, EMPTY, __VA_ARGS__) } while(0)
+#define DEBUG_FMT(a, b) do { Serial.println(a, b); } while(0)
+#define DEBUG_FMT_(a, b) do { Serial.print(a, b); } while(0)
+
+#else
+
+#define DEBUG(...) do { } while (0)
+#define DEBUG_(...) do { } while (0)
+#define DEBUG_FMT(...) do { } while (0)
+#define DEBUG_FMT_(...) do { } while (0)
+
+#endif
 
 struct MPR121Filter {
     byte mhd;
@@ -106,6 +127,7 @@ TouchSequence::TouchSequence(byte mpr121Addr, byte interruptPin) :
 void
 TouchSequence::begin(byte electrodes, byte proximityMode)
 {
+    DEBUG("starting Wire library");
     Wire.begin();
 
     mpr121.ele_en = electrodes & 0x0F;
@@ -114,8 +136,6 @@ TouchSequence::begin(byte electrodes, byte proximityMode)
 
     MPR121Settings defaults;
     applySettings(defaults);
-    // default settings are applied, it's time to run...
-    wakeUp();
     clear();
 }
 
@@ -124,14 +144,21 @@ TouchSequence::setRegister(byte reg, byte val)
 {
     MPR121ConfigLock lock(this, reg != ECR && reg < 0x72);
 
+    DEBUG_("setRegister: 0x");
+    DEBUG_FMT_(reg, HEX);
+    DEBUG_(" : 0x");
+    DEBUG_FMT(val, HEX);
+
     Wire.beginTransmission(mpr121Addr);
     Wire.write(reg);
     Wire.write(val);
     errorCode = Wire.endTransmission();
 
     // automatically update the running flag if ECR is set
-    if (errorCode == 0 && reg == ECR)
+    if (errorCode == 0 && reg == ECR) {
         running = val & 0x3F;
+        DEBUG("setRegister:", running ? " running" : " not running");
+    }
 
     return errorCode == 0;
 }
@@ -144,7 +171,15 @@ TouchSequence::getRegister(byte reg)
     Wire.endTransmission(false);
     Wire.requestFrom(mpr121Addr, (byte)1);
     errorCode = Wire.endTransmission();
-    return Wire.read();
+
+    byte val = Wire.read();
+
+    DEBUG_("getRegister: 0x");
+    DEBUG_FMT_(reg, HEX);
+    DEBUG_(" : 0x");
+    DEBUG_FMT(val, HEX);
+
+    return val;
 }
 
 void
@@ -159,11 +194,11 @@ TouchSequence::applyFilter(byte baseReg, struct MPR121Filter &filter)
 }
 
 void
-TouchSequence::setTouchThreshold(byte val, byte reg)
+TouchSequence::setTouchThreshold(byte val, byte ele)
 {
     MPR121ConfigLock lock(this);
-    if (reg < 13)
-        setRegister(E0TTH + (reg << 1), val);
+    if (ele < 13)
+        setRegister(E0TTH + (ele << 1), val);
     else {
         for (int i = 0; i < 13; ++i)
             setRegister(E0TTH + (i << 1), val);
@@ -171,11 +206,11 @@ TouchSequence::setTouchThreshold(byte val, byte reg)
 }
 
 void
-TouchSequence::setReleaseThreshold(byte val, byte reg)
+TouchSequence::setReleaseThreshold(byte val, byte ele)
 {
     MPR121ConfigLock lock(this);
-    if (reg < 13)
-        setRegister(E0RTH + (reg << 1), val);
+    if (ele < 13)
+        setRegister(E0RTH + (ele << 1), val);
     else {
         for (int i = 0; i < 13; ++i)
             setRegister(E0RTH + (i << 1), val);
@@ -185,6 +220,7 @@ TouchSequence::setReleaseThreshold(byte val, byte reg)
 void
 TouchSequence::applySettings(MPR121Settings &settings)
 {
+    DEBUG("applySettings:");
     MPR121ConfigLock lock(this);
 
     applyFilter(MHDR, settings.electrode.rising);
@@ -228,6 +264,8 @@ TouchSequence::sleep(SleepMode mode)
         case SLEEP_PROXIMITY_OFF:   mask = 0xCF; break;
         case SLEEP_ALL_OFF:         mask = 0xC0; break;
     }
+    DEBUG_("sleep: setting ECR register to: ");
+    DEBUG_FMT(mpr121.ecr & mask, HEX);
     // mask the lower bits to turn proximity/touch electrodes off
     setRegister(ECR, mpr121.ecr & mask);
 }
@@ -251,15 +289,15 @@ TouchSequence::wakeUp()
     if (running)
         return;
     // restore the current configuration
+    DEBUG_("wakeUp: setting ECR register to: ");
+    DEBUG_FMT(mpr121.ecr, HEX);
     setRegister(ECR, mpr121.ecr);
 }
 
 bool
 TouchSequence::update()
 {
-#if defined(DEBUG_TOUCH)
-    Serial.println("updating sensors:");
-#endif
+    DEBUG("update:");
     int prevTouchedState = mpr121.touched.all;
     // clears the interrupt
     mpr121.touched.status[0] = getRegister(ELE0_7);
@@ -271,23 +309,16 @@ TouchSequence::update()
         // test to see if there was a change
         if (prevTouchedState ^ mpr121.touched.all) {
             if (mpr121.touched.all & (1 << i)) {
-#if defined(DEBUG_TOUCH)
-                Serial.print("touch: ");
-#endif
+                DEBUG("touch: ", i);
                 seq[idx++] = i;
                 if (idx >= MAX_TOUCH_SEQ)
                     idx = MAX_TOUCH_SEQ;
             }
-#if defined(DEBUG_TOUCH)
             else
-                Serial.print("release: ");
-#endif
+                DEBUG("release: ", i);
         }
-#if defined(DEBUG_TOUCH)
         else
-            Serial.print("repeat: ");
-        Serial.println(i, DEC);
-#endif
+            DEBUG("repeat: ", i);
     }
 
     if (mpr121.touched.eleprox && seq[0] == 0xFF)
@@ -301,6 +332,7 @@ TouchSequence::update()
 void
 TouchSequence::clear()
 {
+    DEBUG("clear:");
     for (int i = 0; i < MAX_TOUCH_SEQ; ++i)
         seq[i] = 0xFF;
     idx = 0;
@@ -378,14 +410,11 @@ TouchSequence::checkTap()
 TouchGesture
 TouchSequence::getGesture()
 {
-#if defined(DEBUG_TOUCH)
-    Serial.print("gesture: ");
+    DEBUG_("gesture: ");
     for (int i = 0; i < MAX_TOUCH_SEQ; ++i) {
-        Serial.print(seq[i]);
-        Serial.print(' ');
+        DEBUG_(seq[i], ' ');
     }
-    Serial.println();
-#endif
+    DEBUG();
 
     TouchGesture gesture;
     if ((gesture = checkShortSwipe()) != TOUCH_UNKNOWN)

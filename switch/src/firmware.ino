@@ -28,6 +28,9 @@ void setup() {
     radio.Sleep(); // sleep right away to save power
 
     touch.begin(5, 2);
+    touch.setTouchThreshold(5);
+    touch.setReleaseThreshold(2);
+
     touch.sleep(SLEEP_ELECTRODES_OFF);
 }
 
