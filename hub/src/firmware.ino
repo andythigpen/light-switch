@@ -4,6 +4,7 @@
 #include <RFM12B.h>
 #include "SwitchProtocol.h"
 #include "SwitchSettings.h"
+#include "CmdMessenger.h"
 
 RFM12B radio;
 
@@ -12,95 +13,78 @@ RFM12B radio;
 #define FREQUENCY   RF12_915MHZ
 #define ACK_TIME    30  // # of ms to wait for an ack
 
+#define CMD_MSG             0
+#define CMD_TOUCH_EVENT     1
+#define CMD_STATUS_EVENT    2
+
+CmdMessenger cmd(Serial);
+
 void setup() {
     Serial.begin(115200);
-    while (!Serial);
-
     radio.Initialize(NODEID, FREQUENCY, NETWORKID);
+
+    cmd.attach(onUnknownCommand);
+    cmd.sendCmd(CMD_MSG, "Initialized...");
+}
+
+void onUnknownCommand() {
+    cmd.sendCmd(CMD_MSG, "Unknown command");
 }
 
 void handleTouchEvent() {
     if (*radio.DataLen != sizeof(TouchEvent)) {
-        Serial.println("bad payload");
+        cmd.sendCmd(CMD_MSG, "bad touch event payload");
         return;
     }
     TouchEvent pkt = *(TouchEvent *)radio.Data;
-    Serial.print(" event: ");
-    Serial.print(pkt.gesture);
-    Serial.print(" electrode:  ");
-    Serial.print(pkt.electrode);
-    Serial.print(" repeat:  ");
-    Serial.print(pkt.repeat);
-    Serial.println();
-    switch (pkt.gesture) {
-        case TOUCH_SWIPE_DOWN:
-            Serial.println("swipe down");
-            break;
-        case TOUCH_SWIPE_UP:
-            Serial.println("swipe up");
-            break;
-        case TOUCH_SWIPE_LEFT:
-            Serial.println("swipe left");
-            break;
-        case TOUCH_SWIPE_RIGHT:
-            Serial.println("swipe right");
-            break;
-        case TOUCH_TAP:
-            Serial.print("tap ");
-            Serial.println(pkt.electrode);
-            break;
-        case TOUCH_DOUBLE_TAP:
-            Serial.print("double tap ");
-            Serial.println(pkt.electrode);
-            break;
-        case TOUCH_PROXIMITY:
-            Serial.println("proximity");
-            break;
-        default:
-            Serial.println("no gesture");
-            break;
-    }
+    cmd.sendCmdStart(CMD_TOUCH_EVENT);
+    cmd.sendCmdArg(radio.GetSender());
+    cmd.sendCmdArg(pkt.gesture);
+    cmd.sendCmdArg(pkt.electrode);
+    cmd.sendCmdArg(pkt.repeat);
+    cmd.sendCmdEnd();
 }
 
 void handleStatusUpdate() {
     if (*radio.DataLen != sizeof(SwitchStatus)) {
-        Serial.println("bad payload");
+        cmd.sendCmd(CMD_MSG, "bad status event payload");
         return;
     }
     SwitchStatus pkt = *(SwitchStatus *)radio.Data;
-    Serial.print(" vcc: ");
-    Serial.print(pkt.batteryLevel);
-    //TODO: send reconfiguration packet, if available
+    cmd.sendCmdStart(CMD_STATUS_EVENT);
+    cmd.sendCmdArg(radio.GetSender());
+    cmd.sendCmdArg(pkt.batteryLevel);
+    cmd.sendCmdEnd();
+}
+
+void handleIncomingPacket() {
+    if (!radio.CRCPass()) {
+        return;
+    }
+
+    unsigned char type = *(unsigned char *)radio.Data;
+    switch (type) {
+        case SwitchPacket::TOUCH_EVENT:
+            handleTouchEvent();
+            break;
+        case SwitchPacket::STATUS_UPDATE:
+            handleStatusUpdate();
+            break;
+        default:
+            cmd.sendCmd(CMD_MSG, "unknown event");
+            break;
+    }
+
+    if (radio.ACKRequested()) {
+        //TODO: send reconfiguration packet, if available
+        SwitchPacket ping(SwitchPacket::PING, sizeof(SwitchPacket));
+        radio.SendACK((void *)&ping, sizeof(ping));
+    }
 }
 
 void loop() {
     if (radio.ReceiveComplete()) {
-        if (radio.CRCPass()) {
-            byte nodeid = radio.GetSender();
-            Serial.print('[');
-            Serial.print(nodeid);
-            Serial.print(']');
-
-            unsigned char type = *(unsigned char *)radio.Data;
-            switch (type) {
-                case SwitchPacket::TOUCH_EVENT:
-                    handleTouchEvent();
-                    break;
-                case SwitchPacket::STATUS_UPDATE:
-                    handleStatusUpdate();
-                    break;
-                default:
-                    Serial.println("unknown event");
-                    break;
-            }
-
-            if (radio.ACKRequested()) {
-                SwitchPacket ping(SwitchPacket::PING, sizeof(SwitchPacket));
-                Serial.println("ack:");
-                radio.SendACK((void *)&ping, sizeof(ping));
-                // radio.SendACK();
-            }
-            Serial.println();
-        }
+        handleIncomingPacket();
     }
+    cmd.feedinSerialData();
 }
