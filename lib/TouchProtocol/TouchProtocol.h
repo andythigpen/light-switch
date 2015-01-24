@@ -12,4 +12,26 @@ enum TouchGesture {
     TOUCH_PROXIMITY,
 };
 
+enum Electrode {
+    ELECTRODE_TOP,
+    ELECTRODE_LEFT,
+    ELECTRODE_BOTTOM,
+    ELECTRODE_RIGHT,
+    ELECTRODE_CENTER,
+    ELECTRODE_PROXIMITY = 12,
+};
+
+enum PacketType {
+    PKT_TOUCH_EVENT,
+    PKT_STATUS_UPDATE,
+};
+
+struct TouchEvent {
+    TouchEvent() : type(PKT_TOUCH_EVENT) {}
+    unsigned char type;
+    unsigned char gesture;
+    unsigned char electrode;
+    unsigned char repeat;
+};
+
 #endif // TOUCHPROTOCOL_H

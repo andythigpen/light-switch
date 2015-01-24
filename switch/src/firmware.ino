@@ -43,21 +43,13 @@ void sleep(period_t time) {
     LowPower.powerDown(time, ADC_OFF, BOD_OFF);
 }
 
-//TODO: move to a shared lib
-//TODO: add a repeated flag
-typedef struct {
-    int nodeid;
-    int event;
-    int electrode;
-} Payload;
-Payload data;
-
-
-void handleEvent() {
-    data.nodeid = NODEID;
-    data.event = touch.getGesture();
-    data.electrode = touch.getLastTouch();
-    switch (data.event) {
+/* Sends a touch event to the base station */
+void handleEvent(byte repeated) {
+    TouchEvent pkt;
+    pkt.gesture = touch.getGesture();
+    pkt.electrode = touch.getLastTouch();
+    pkt.repeat = repeated;
+    switch (pkt.gesture) {
         case TOUCH_SWIPE_DOWN:
             Serial.println("swipe down");
             break;
@@ -72,11 +64,11 @@ void handleEvent() {
             break;
         case TOUCH_TAP:
             Serial.print("tap ");
-            Serial.println(data.electrode);
+            Serial.println(pkt.electrode);
             break;
         case TOUCH_DOUBLE_TAP:
             Serial.print("double tap ");
-            Serial.println(data.electrode);
+            Serial.println(pkt.electrode);
             break;
         case TOUCH_PROXIMITY:
             Serial.println("proximity");
@@ -86,7 +78,7 @@ void handleEvent() {
             return;
     }
     radio.Wakeup();
-    radio.Send(GATEWAYID, (const void*)(&data), sizeof(data), false);
+    radio.Send(GATEWAYID, (const void*)(&pkt), sizeof(pkt), false);
     radio.Sleep();
 }
 
@@ -116,13 +108,13 @@ void loop() {
         // touch - this is a repeat event
         touch.update();
         Serial.println("repeat");
-        handleEvent();
+        handleEvent(1);
         sleepPeriod = SLEEP_250MS;
     }
     else {
         // no touch interrupt, no previous touch...handle the event and then
         // clear everything to reset.
-        handleEvent();
+        handleEvent(0);
         touch.clear();
         Serial.println("Sleeping forever");
         Serial.println();
