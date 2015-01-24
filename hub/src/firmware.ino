@@ -2,7 +2,7 @@
 // Capacitive touch light switch hub
 //
 #include <RFM12B.h>
-#include "TouchProtocol.h"
+#include "SwitchProtocol.h"
 
 RFM12B radio;
 
@@ -61,6 +61,17 @@ void handleTouchEvent() {
     }
 }
 
+void handleStatusUpdate() {
+    if (*radio.DataLen != sizeof(SwitchStatus)) {
+        Serial.println("bad payload");
+        return;
+    }
+    SwitchStatus pkt = *(SwitchStatus *)radio.Data;
+    Serial.print(" vcc: ");
+    Serial.print(pkt.batteryLevel);
+    //TODO: send reconfiguration packet, if available
+}
+
 void loop() {
     if (radio.ReceiveComplete()) {
         if (radio.CRCPass()) {
@@ -70,8 +81,11 @@ void loop() {
 
             unsigned char type = *(unsigned char *)radio.Data;
             switch (type) {
-                case PKT_TOUCH_EVENT:
+                case SwitchPacket::TOUCH_EVENT:
                     handleTouchEvent();
+                    break;
+                case SwitchPacket::STATUS_UPDATE:
+                    handleStatusUpdate();
                     break;
                 default:
                     Serial.println("unknown event");

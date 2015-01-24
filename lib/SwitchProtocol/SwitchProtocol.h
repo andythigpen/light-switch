@@ -1,6 +1,17 @@
 #ifndef SWITCHPROTOCOL_H
 #define SWITCHPROTOCOL_H
 
+enum TouchGesture {
+    TOUCH_UNKNOWN,
+    TOUCH_TAP,
+    TOUCH_DOUBLE_TAP,
+    TOUCH_SWIPE_UP,
+    TOUCH_SWIPE_DOWN,
+    TOUCH_SWIPE_LEFT,
+    TOUCH_SWIPE_RIGHT,
+    TOUCH_PROXIMITY,
+};
+
 struct SwitchPacket {
     SwitchPacket(unsigned char type) : type(type) {}
     enum PacketType {

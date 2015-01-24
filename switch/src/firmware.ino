@@ -13,8 +13,10 @@
 
 #define GATEWAYID   1
 
-static const int mpr121Addr   = 0x5A;
-static const int mpr121IntPin = 1;      // int 1 == pin 3
+static const int mpr121Addr         = 0x5A;
+static const int mpr121IntPin       = 1;    // int 1 == pin 3
+static const byte wakeUpInterval    = 150;  // 150 * 2^11 = 307,200 ms ~= 5min
+static const byte wakeUpScaler      = 11;
 
 RFM12B radio;
 TouchSequence touch(mpr121Addr, mpr121IntPin);
@@ -75,7 +77,19 @@ void handleEvent(byte repeated) {
     }
     radio.Wakeup();
     radio.Send(GATEWAYID, (const void*)(&pkt), sizeof(pkt), false);
-    radio.Sleep();
+    radio.Sleep(wakeUpInterval, wakeUpScaler);
+}
+
+void sendStatus() {
+    SwitchStatus pkt;
+    pkt.batteryLevel = readVcc();
+    Serial.print("vcc: ");
+    Serial.println(pkt.batteryLevel);
+
+    radio.Wakeup();
+    radio.Send(GATEWAYID, (const void*)(&pkt), sizeof(pkt), false);
+    radio.Sleep(wakeUpInterval, wakeUpScaler);
+    //TODO: keep radio in recv briefly to listen for reconfigure responses
 }
 
 void setup() {
@@ -91,7 +105,7 @@ void setup() {
     Serial.println("  * radio...");
     radio.Initialize(NODEID, RF12_915MHZ, NETWORKID);
     /* radio.Encrypt(KEY); */
-    radio.Sleep(); // sleep right away to save power
+    radio.Sleep(wakeUpInterval, wakeUpScaler); // sleep right away to save power
 
     Serial.println("  * touch sensor...");
     touch.begin(5, 2);
@@ -108,6 +122,8 @@ void setup() {
 
 void loop() {
     sleep(sleepPeriod);
+    if (radio.DidTimeOut())
+        sendStatus();
 
     if (touch.isInterrupted()) {
         // either a touch or release event woke us up
