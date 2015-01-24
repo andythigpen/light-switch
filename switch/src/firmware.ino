@@ -28,6 +28,16 @@ period_t sleepPeriod = SLEEP_FOREVER;
 
 extern long readVcc();
 
+void softReset() {
+    //TODO: this doesn't work correctly...check the datasheet
+    // soft-reset
+    // wdt_enable(WDTO_15MS);
+    // while (1);
+    Serial.println("softReset:");
+    Serial.flush();
+    asm volatile ("  jmp 0");
+}
+
 void sleep(period_t time) {
     Serial.print("sleep: ");
     Serial.println(time);
