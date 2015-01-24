@@ -1,22 +1,26 @@
 //
 // Capacitive touch light switch
 //
+#include <Arduino.h>
 #include <avr/wdt.h>
+#include <EEPROM.h>
 #include "LowPower.h"
 #include "TouchSequence.h"
 #include "RFM12B.h"
 #include "SwitchProtocol.h"
+#include "SwitchSettings.h"
+#include "util.h"
 
 #ifndef NETWORKID
 #error "NETWORKID must be defined!"
 #endif
 
-#define GATEWAYID   1
-
 static const int mpr121Addr         = 0x5A;
 static const int mpr121IntPin       = 1;    // int 1 == pin 3
-static const byte wakeUpInterval    = 150;  // 150 * 2^11 = 307,200 ms ~= 5min
-static const byte wakeUpScaler      = 11;
+
+static MPR121Settings mpr121Settings;
+static RFM12BSettings rfm12bSettings;
+static SleepSettings  sleepSettings;
 
 RFM12B radio;
 TouchSequence touch(mpr121Addr, mpr121IntPin);
@@ -77,7 +81,7 @@ void handleEvent(byte repeated) {
     }
     radio.Wakeup();
     radio.Send(GATEWAYID, (const void*)(&pkt), sizeof(pkt), false);
-    radio.Sleep(wakeUpInterval, wakeUpScaler);
+    radio.Sleep(sleepSettings.wakeUpInterval, sleepSettings.wakeUpScaler);
 }
 
 void sendStatus() {
@@ -88,8 +92,33 @@ void sendStatus() {
 
     radio.Wakeup();
     radio.Send(GATEWAYID, (const void*)(&pkt), sizeof(pkt), false);
-    radio.Sleep(wakeUpInterval, wakeUpScaler);
+    radio.Sleep(sleepSettings.wakeUpInterval, sleepSettings.wakeUpScaler);
     //TODO: keep radio in recv briefly to listen for reconfigure responses
+}
+
+void waitForConfiguration() {
+    while (true) {
+    }
+}
+
+void loadConfiguration() {
+    int offset = 0;
+    if (EEPROM.read(offset++) != FIRMWARE_VERSION)
+        return;
+
+    // second byte bitmask indicating which settings are set
+    byte enabled = EEPROM.read(offset++);
+    if (enabled & SETTINGS_MPR121)
+        loadSettings(offset, mpr121Settings);
+    offset += sizeof(MPR121Settings);
+
+    if (enabled & SETTINGS_RFM12B)
+        loadSettings(offset, rfm12bSettings);
+    offset += sizeof(RFM12BSettings);
+
+    if (enabled & SETTINGS_SLEEP)
+        loadSettings(offset, sleepSettings);
+    offset += sizeof(SleepSettings);
 }
 
 void setup() {
@@ -102,15 +131,15 @@ void setup() {
     //pinMode(5, OUTPUT);
     //digitalWrite(5, LOW);
 
+    loadConfiguration();
+
     Serial.println("  * radio...");
-    radio.Initialize(NODEID, RF12_915MHZ, NETWORKID);
+    radio.Initialize(rfm12bSettings.nodeId, DEFAULT_FREQ_BAND, NETWORKID);
     /* radio.Encrypt(KEY); */
-    radio.Sleep(wakeUpInterval, wakeUpScaler); // sleep right away to save power
+    radio.Sleep(sleepSettings.wakeUpInterval, sleepSettings.wakeUpScaler);
 
     Serial.println("  * touch sensor...");
-    touch.begin(5, 2);
-    touch.setTouchThreshold(5);
-    touch.setReleaseThreshold(2);
+    touch.begin(mpr121Settings);
 
     // proximity thresholds
     touch.setTouchThreshold(2, 12);
@@ -131,16 +160,16 @@ void loop() {
         if (touch.isTouched()) {
             Serial.print("touch event: ");
             Serial.println(touch.getLastTouch());
-            sleepPeriod = SLEEP_500MS;
+            sleepPeriod = (period_t)sleepSettings.touch;
         }
         else if (touch.isProximity()) {
             Serial.println("proximity event: ");
-            sleepPeriod = SLEEP_2S;
+            sleepPeriod = (period_t)sleepSettings.proximity;
         }
         else {
             Serial.print("release event: ");
             Serial.println(touch.getLastTouch());
-            sleepPeriod = SLEEP_250MS;
+            sleepPeriod = (period_t)sleepSettings.release;
         }
         touch.wakeUp();
     }
@@ -150,7 +179,7 @@ void loop() {
         touch.update();
         Serial.println("repeat");
         handleEvent(1);
-        sleepPeriod = SLEEP_250MS;
+        sleepPeriod = (period_t)sleepSettings.repeat;
     }
     else {
         // no touch interrupt, no previous touch...handle the event and then

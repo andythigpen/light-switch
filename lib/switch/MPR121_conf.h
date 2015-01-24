@@ -15,6 +15,14 @@ struct MPR121FilterGroup {
 };
 
 struct MPR121Settings {
+    //   electrodes:    number of electrodes to enable (1-12, 0 = disabled)
+    byte electrodes;
+    //   proximityMode: 0 = disabled
+    //                  1 = electrodes 0-1
+    //                  2 = electrodes 0-3
+    //                  3 = electrodes 0-11
+    byte proximityMode;
+
     // filter configuration
     struct MPR121FilterGroup electrode;
     struct MPR121FilterGroup proximity;
@@ -38,6 +46,8 @@ struct MPR121Settings {
     byte release;
 
     MPR121Settings() :
+        electrodes(5),
+        proximityMode(2),
         debounce(0x11),
         afe1(0x3F),
         afe2(0x24),
@@ -57,7 +67,5 @@ struct MPR121Settings {
         proximity.touched = (MPR121Filter){ 0x00, 0x00, 0x00, 0x00 };
     }
 };
-
-extern struct MPR121Settings defaultSettings;
 
 #endif // MPR121_CONF_H

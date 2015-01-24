@@ -20,3 +20,13 @@ int EEPROM_readAnything(int ee, T& value)
         *p++ = EEPROM.read(ee++);
     return i;
 }
+
+template <class T>
+int loadSettings(int offset, T &dest)
+{
+    T settings;
+    if (EEPROM_readAnything(offset, settings) == sizeof(T))
+        dest = settings;
+    else
+        Serial.println("failed to load settings");
+}

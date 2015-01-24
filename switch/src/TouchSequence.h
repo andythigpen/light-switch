@@ -7,7 +7,7 @@
   #include <WProgram.h> // Arduino 0022
 #endif
 
-#include "SwitchProtocol.h"
+#include "SwitchSettings.h"
 
 #ifndef MAX_TOUCH_SEQ
 #define MAX_TOUCH_SEQ 4
@@ -44,12 +44,7 @@ class TouchSequence {
         TouchSequence(byte mpr121Addr, byte interruptPin);
 
         // Initialize the TouchSequence instance, MPR121
-        //   electrodes:    number of electrodes to enable (1-12, 0 = disabled)
-        //   proximityMode: 0 = disabled
-        //                  1 = electrodes 0-1
-        //                  2 = electrodes 0-3
-        //                  3 = electrodes 0-11
-        void begin(byte electrodes, byte proximityMode);
+        void begin(MPR121Settings &defaultSettings);
         // attaches the hardware interrupt
         // the interrupt will automatically be detached when it runs, so
         // enableInterrupt must be called again prior to going to sleep

@@ -4,8 +4,6 @@
 #include "MPR121_conf.h"
 #include "debug.h"
 
-struct MPR121Settings defaultSettings;
-
 // make sure that the MPR121 is stopped when configuring registers
 struct MPR121ConfigLock {
     MPR121ConfigLock(TouchSequence *inst, bool acquireImmediately=true) :
@@ -57,14 +55,14 @@ TouchSequence::TouchSequence(byte mpr121Addr, byte interruptPin) :
 }
 
 void
-TouchSequence::begin(byte electrodes, byte proximityMode)
+TouchSequence::begin(MPR121Settings &defaultSettings)
 {
     DEBUG("starting Wire library");
     Wire.begin();
 
-    mpr121.ele_en = electrodes & 0x0F;
-    mpr121.eleprox_en = proximityMode & 0x03;
-    mpr121.cl = 2;
+    // mpr121.ele_en = electrodes & 0x0F;
+    // mpr121.eleprox_en = proximityMode & 0x03;
+    // mpr121.cl = 2;
 
     applySettings(defaultSettings);
     setTouchThreshold(defaultSettings.touch);
@@ -87,7 +85,7 @@ TouchSequence::dump()
             DEBUG_("0x0", i, " ");
         DEBUG_FMT_(getRegister(i), HEX);
         if (i % 8 == 7)
-            DEBUG();
+            DEBUG("");
         else
             DEBUG_(" ");
     }
@@ -231,6 +229,10 @@ TouchSequence::applySettings(MPR121Settings &settings)
 {
     DEBUG("applySettings:");
     MPR121ConfigLock lock(this);
+
+    mpr121.ele_en = settings.electrodes & 0x0F;
+    mpr121.eleprox_en = settings.proximityMode & 0x03;
+    mpr121.cl = 2;
 
     applyFilter(MHDR, settings.electrode.rising);
     applyFilter(MHDF, settings.electrode.falling);

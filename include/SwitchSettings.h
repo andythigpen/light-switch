@@ -2,8 +2,8 @@
 #define SWITCH_SETTINGS_H
 
 #include "MPR121_conf.h"
-#include "LowPower.h"
-#include "RFM12B.h"
+#include "LowPower/LowPower.h"
+#include "RFM12B/RFM12B.h"
 
 // current version of the firmware
 #define FIRMWARE_VERSION 1
