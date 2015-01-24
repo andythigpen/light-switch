@@ -29,10 +29,6 @@ period_t sleepPeriod = SLEEP_FOREVER;
 extern long readVcc();
 
 void softReset() {
-    //TODO: this doesn't work correctly...check the datasheet
-    // soft-reset
-    // wdt_enable(WDTO_15MS);
-    // while (1);
     Serial.println("softReset:");
     Serial.flush();
     asm volatile ("  jmp 0");
@@ -58,6 +54,9 @@ void sleep(period_t time) {
 
 void loadConfiguration() {
     SwitchSettings::Header firmware;
+
+    Serial.println("loadConfiguration:");
+
     EEPROM_readAnything(0, firmware);
     if (firmware.major != FIRMWARE_MAJOR_VERSION ||
         firmware.minor != FIRMWARE_MINOR_VERSION) {
@@ -71,17 +70,32 @@ void loadConfiguration() {
 }
 
 void saveConfiguration() {
-    SwitchSettings::Header firmware;
-    EEPROM_readAnything(0, firmware);
-    if (firmware.major != FIRMWARE_MAJOR_VERSION ||
-        firmware.minor != FIRMWARE_MINOR_VERSION) {
-        firmware.major = FIRMWARE_MAJOR_VERSION;
-        firmware.minor = FIRMWARE_MINOR_VERSION;
-        EEPROM_writeAnything(0, firmware);
+    SwitchSettings settings;
+
+    Serial.println("saveConfiguration:");
+
+    EEPROM_readAnything(0, settings);
+    if (settings.header.major != FIRMWARE_MAJOR_VERSION ||
+        settings.header.minor != FIRMWARE_MINOR_VERSION) {
+        Serial.println("updating firmware version...");
+        settings.header.major = FIRMWARE_MAJOR_VERSION;
+        settings.header.minor = FIRMWARE_MINOR_VERSION;
+        EEPROM_writeAnything(0, settings.header);
     }
-    EEPROM_writeAnything(offsetof(SwitchSettings, mpr121), mpr121Settings);
-    EEPROM_writeAnything(offsetof(SwitchSettings, rfm12b), rfm12bSettings);
-    EEPROM_writeAnything(offsetof(SwitchSettings, sleep), sleepSettings);
+    if (memcmp(&settings.mpr121, &mpr121Settings,
+                sizeof(mpr121Settings)) != 0) {
+        Serial.println("mpr121 settings changed, writing...");
+        EEPROM_writeAnything(offsetof(SwitchSettings, mpr121), mpr121Settings);
+    }
+    if (memcmp(&settings.rfm12b, &rfm12bSettings,
+                sizeof(rfm12bSettings)) != 0) {
+        Serial.println("rfm12b settings changed, writing...");
+        EEPROM_writeAnything(offsetof(SwitchSettings, rfm12b), rfm12bSettings);
+    }
+    if (memcmp(&settings.sleep, &sleepSettings, sizeof(sleepSettings)) != 0) {
+        Serial.println("sleep settings changed, writing...");
+        EEPROM_writeAnything(offsetof(SwitchSettings, sleep), sleepSettings);
+    }
 }
 
 void handleReply() {
@@ -123,11 +137,10 @@ void handleReply() {
                 SwitchReset *pkt = (SwitchReset *)header;
                 if (pkt->resetSettings) {
                     Serial.println("resetting settings");
-                    EEPROM_writeAnything(0, 255);
+                    byte v = 255;
+                    EEPROM_writeAnything(0, v);
                 }
-                // soft-reset
-                wdt_enable(WDTO_15MS);
-                while (1);
+                softReset();
                 break;
             }
             default:
@@ -140,6 +153,7 @@ void handleReply() {
 
     if (settingsChanged) {
         saveConfiguration();
+        softReset();
     }
 }
 

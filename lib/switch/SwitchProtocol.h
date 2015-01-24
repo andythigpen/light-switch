@@ -1,6 +1,8 @@
 #ifndef SWITCHPROTOCOL_H
 #define SWITCHPROTOCOL_H
 
+#include "SwitchSettings.h"
+
 struct SwitchPacket {
     SwitchPacket(unsigned char type, unsigned char len) :
         type(type), len(len) {}
