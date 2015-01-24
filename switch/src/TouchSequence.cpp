@@ -2,7 +2,6 @@
 #include "MPR121.h"
 
 // #define DEBUG_TOUCH
-#define PROXIMITY_ELEC 12
 
 static void wakeUpInt0() {
     detachInterrupt(0);
@@ -17,11 +16,11 @@ TouchSequence::TouchSequence(byte mpr121Addr, byte interruptPin) :
     proximityEvent(false)
 {
     electrodes.total  = 12;
-    electrodes.top    = 0;
-    electrodes.left   = 1;
-    electrodes.bottom = 2;
-    electrodes.right  = 3;
-    electrodes.center = 4;
+    electrodes.top    = ELECTRODE_TOP;
+    electrodes.left   = ELECTRODE_LEFT;
+    electrodes.bottom = ELECTRODE_BOTTOM;
+    electrodes.right  = ELECTRODE_RIGHT;
+    electrodes.center = ELECTRODE_CENTER;
 }
 
 void
@@ -48,8 +47,8 @@ TouchSequence::begin(byte electrodes, byte proxMode)
 
     // proximity threshold settings
     if (proxMode) {
-        MPR121.setReleaseThreshold(PROXIMITY_ELEC, 1);
-        MPR121.setTouchThreshold(PROXIMITY_ELEC, 2);
+        MPR121.setReleaseThreshold(ELECTRODE_PROXIMITY, 1);
+        MPR121.setTouchThreshold(ELECTRODE_PROXIMITY, 2);
     }
 
     clear();
@@ -70,11 +69,9 @@ bool
 TouchSequence::checkRepeatMode()
 {
     touched = MPR121.getTouchData(seq[idx - 1]);
-    // proximity = MPR121.getTouchData(PROXIMITY_ELEC);
 #if defined(DEBUG_TOUCH)
     Serial.print("repeat: ");
     Serial.println(touched ? "touch" : "no touch");
-    // Serial.println(proximity ? "proximity" : "no proximity");
 #endif
     return touched;
 }
@@ -110,7 +107,7 @@ TouchSequence::update()
         }
     }
 
-    proximity = MPR121.getTouchData(PROXIMITY_ELEC);
+    proximity = MPR121.getTouchData(ELECTRODE_PROXIMITY);
     if (proximity && seq[0] == 0xFF)
         proximityEvent = true;
     else if (seq[0] != 0xFF)
@@ -249,7 +246,7 @@ TouchSequence::isTouched()
 bool
 TouchSequence::isProximity()
 {
-    return proximity;
+    return proximityEvent && proximity;
 }
 
 byte

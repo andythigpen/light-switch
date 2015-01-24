@@ -7,7 +7,7 @@
   #include <WProgram.h> // Arduino 0022
 #endif
 
-#include "TouchEvent.h"
+#include "TouchProtocol.h"
 
 #ifndef MAX_TOUCH_SEQ
 #define MAX_TOUCH_SEQ 4

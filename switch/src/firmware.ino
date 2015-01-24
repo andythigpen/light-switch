@@ -95,14 +95,15 @@ void loop() {
 
     if (touch.isInterrupted()) {
         // either a touch or release event woke us up
-        if (touch.update()) {
+        touch.update();
+        if (touch.isTouched()) {
             Serial.print("touch event: ");
             Serial.println(touch.getLastTouch());
             sleepPeriod = SLEEP_500MS;
         }
         else if (touch.isProximity()) {
             Serial.println("proximity event: ");
-            sleepPeriod = SLEEP_1S;
+            sleepPeriod = SLEEP_2S;
         }
         else {
             Serial.print("release event: ");
