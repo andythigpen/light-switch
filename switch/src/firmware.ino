@@ -7,8 +7,10 @@
 #include "RFM12B.h"
 #include "SwitchProtocol.h"
 
-#define NODEID      2
-#define NETWORKID   1
+#ifndef NETWORKID
+#error "NETWORKID must be defined!"
+#endif
+
 #define GATEWAYID   1
 
 static const int mpr121Addr   = 0x5A;
