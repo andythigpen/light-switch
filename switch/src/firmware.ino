@@ -19,7 +19,7 @@ period_t sleepPeriod = SLEEP_FOREVER;
 
 void setup() {
     // initialize serial
-    Serial.begin(57600);
+    Serial.begin(115200);
     while (!Serial);
     Serial.println("initializing...");
 
