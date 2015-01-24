@@ -3,6 +3,7 @@
 //
 #include <RFM12B.h>
 #include "SwitchProtocol.h"
+#include "SwitchSettings.h"
 
 RFM12B radio;
 
@@ -75,8 +76,9 @@ void handleStatusUpdate() {
 void loop() {
     if (radio.ReceiveComplete()) {
         if (radio.CRCPass()) {
+            byte nodeid = radio.GetSender();
             Serial.print('[');
-            Serial.print(radio.GetSender());
+            Serial.print(nodeid);
             Serial.print(']');
 
             unsigned char type = *(unsigned char *)radio.Data;
@@ -93,8 +95,10 @@ void loop() {
             }
 
             if (radio.ACKRequested()) {
-                byte nodeid = radio.GetSender();
-                radio.SendACK();
+                SwitchPacket ping(SwitchPacket::PING);
+                Serial.println("ack:");
+                radio.SendACK((void *)&ping, sizeof(ping));
+                // radio.SendACK();
             }
             Serial.println();
         }

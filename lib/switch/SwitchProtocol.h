@@ -8,6 +8,7 @@ struct SwitchPacket {
         STATUS_UPDATE,
         RESET,
         CONFIGURE,
+        PING,
     };
     unsigned char type;
 };

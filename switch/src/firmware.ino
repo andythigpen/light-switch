@@ -29,9 +29,12 @@ period_t sleepPeriod = SLEEP_FOREVER;
 extern long readVcc();
 
 void sleep(period_t time) {
+    Serial.print("sleep: ");
+    Serial.println(time);
+
     // flush serial for debugging before powering down
-    delay(100);
     Serial.flush();
+    delay(100);
 
     // turn off the wdt in case it was previously set...this is to prevent a
     // spurious wakeup after an interrupt and then sleep forever call.
@@ -43,6 +46,40 @@ void sleep(period_t time) {
         LowPower.powerStandby(time, ADC_OFF, BOD_OFF);
 }
 
+void handleReply() {
+    Serial.println("handleReply: ");
+    if (*radio.DataLen == 0)
+        return;
+    unsigned char type = *(unsigned char *)radio.Data;
+    switch (type) {
+        case SwitchPacket::PING:
+            Serial.println("ping");
+            break;
+        case SwitchPacket::CONFIGURE:
+            Serial.println("configure");
+            break;
+        case SwitchPacket::RESET:
+            Serial.println("reset");
+            break;
+        default:
+            Serial.print("Unknown type: ");
+            Serial.println(type);
+            break;
+    }
+}
+
+void waitForReply(bool sleep = true) {
+    long now = millis();
+    while (millis() - now <= sleepSettings.replyWakeLock) {
+        if (radio.ACKReceived(GATEWAYID)) {
+            handleReply();
+            break;
+        }
+    }
+    if (sleep)
+        radio.Sleep(sleepSettings.statusInterval, sleepSettings.statusScaler);
+}
+
 /* Sends a touch event to the base station */
 void handleEvent(byte repeated) {
     TouchEvent pkt;
@@ -50,18 +87,11 @@ void handleEvent(byte repeated) {
     pkt.electrode = touch.getLastTouch();
     pkt.repeat = repeated;
     switch (pkt.gesture) {
-        case TOUCH_SWIPE_DOWN:
-            Serial.println("swipe down");
-            break;
-        case TOUCH_SWIPE_UP:
-            Serial.println("swipe up");
-            break;
-        case TOUCH_SWIPE_LEFT:
-            Serial.println("swipe left");
-            break;
-        case TOUCH_SWIPE_RIGHT:
-            Serial.println("swipe right");
-            break;
+        case TOUCH_SWIPE_DOWN:  Serial.println("swipe down");   break;
+        case TOUCH_SWIPE_UP:    Serial.println("swipe up");     break;
+        case TOUCH_SWIPE_LEFT:  Serial.println("swipe left");   break;
+        case TOUCH_SWIPE_RIGHT: Serial.println("swipe right");  break;
+        case TOUCH_PROXIMITY:   Serial.println("proximity");    break;
         case TOUCH_TAP:
             Serial.print("tap ");
             Serial.println(pkt.electrode);
@@ -70,16 +100,14 @@ void handleEvent(byte repeated) {
             Serial.print("double tap ");
             Serial.println(pkt.electrode);
             break;
-        case TOUCH_PROXIMITY:
-            Serial.println("proximity");
-            break;
         default:
             Serial.println("no gesture");
             return;
     }
     radio.Wakeup();
-    radio.Send(GATEWAYID, (const void*)(&pkt), sizeof(pkt), false);
-    radio.Sleep(sleepSettings.wakeUpInterval, sleepSettings.wakeUpScaler);
+    radio.Send(GATEWAYID, (const void*)(&pkt), sizeof(pkt), !repeated);
+    if (!repeated)
+        waitForReply();
 }
 
 void sendStatus() {
@@ -90,13 +118,7 @@ void sendStatus() {
 
     radio.Wakeup();
     radio.Send(GATEWAYID, (const void*)(&pkt), sizeof(pkt), false);
-    radio.Sleep(sleepSettings.wakeUpInterval, sleepSettings.wakeUpScaler);
-    //TODO: keep radio in recv briefly to listen for reconfigure responses
-}
-
-void waitForConfiguration() {
-    while (true) {
-    }
+    radio.Sleep(sleepSettings.statusInterval, sleepSettings.statusScaler);
 }
 
 void loadConfiguration() {
@@ -134,7 +156,7 @@ void setup() {
     Serial.println("  * radio...");
     radio.Initialize(rfm12bSettings.nodeId, DEFAULT_FREQ_BAND, NETWORKID);
     /* radio.Encrypt(KEY); */
-    radio.Sleep(sleepSettings.wakeUpInterval, sleepSettings.wakeUpScaler);
+    radio.Sleep(sleepSettings.statusInterval, sleepSettings.statusScaler);
 
     Serial.println("  * touch sensor...");
     touch.begin(mpr121Settings);
@@ -158,38 +180,30 @@ void loop() {
     if (touch.isInterrupted()) {
         // either a touch or release event woke us up
         touch.update();
-        if (touch.isTouched()) {
-            Serial.print("touch event: ");
-            Serial.println(touch.getLastTouch());
+        if (touch.isTouched())
             sleepPeriod = (period_t)sleepSettings.touch;
-        }
-        else if (touch.isProximity()) {
-            Serial.println("proximity event: ");
+        else if (touch.isProximity())
             sleepPeriod = (period_t)sleepSettings.proximity;
-        }
-        else {
-            Serial.print("release event: ");
-            Serial.println(touch.getLastTouch());
+        else
             sleepPeriod = (period_t)sleepSettings.release;
-        }
         touch.wakeUp();
         touch.enableInterrupt();
     }
     else if (touch.isTouched() || touch.isProximity()) {
-        // we woke up w/o an interrupt, but there was a previous
-        // touch - this is a repeat event
+        // we woke up w/o an interrupt, but an electrode or proximity sensor
+        // is still being touched - this is a repeat event
         touch.update();
-        Serial.println("repeat");
+        Serial.println("repeat:");
         handleEvent(1);
         sleepPeriod = (period_t)sleepSettings.repeat;
     }
     else {
-        // no touch interrupt, no previous touch...handle the event and then
-        // clear everything to reset.
+        // no touch interrupt, no current touch - this is a timeout.
+        // handle the event and then clear everything to reset.
         handleEvent(0);
         touch.clear();
         touch.sleep();
-        Serial.println("Sleeping forever");
+        Serial.println("touch done:");
         Serial.println();
         sleepPeriod = SLEEP_FOREVER;
     }

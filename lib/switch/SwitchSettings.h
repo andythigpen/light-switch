@@ -35,16 +35,18 @@ struct SleepSettings {
     byte release;
     byte proximity;
     byte repeat;
-    byte wakeUpInterval;
-    byte wakeUpScaler;
+    byte replyWakeLock;
+    byte statusInterval;
+    byte statusScaler;
 
     SleepSettings() :
         touch(SLEEP_500MS),
         release(SLEEP_250MS),
         proximity(SLEEP_1S),
         repeat(SLEEP_250MS),
-        wakeUpInterval(150),    // 150 * 2^11 = 307,200 ms ~= 5min
-        wakeUpScaler(11)
+        replyWakeLock(30),      // keep mcu awake at most 30ms for ACK replies
+        statusInterval(110),    // 150 * 2^11 = 3,604,480 ms ~= 1 hr
+        statusScaler(15)
     {
     }
 };
