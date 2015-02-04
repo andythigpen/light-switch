@@ -118,7 +118,7 @@ class CmdMessengerReader(object):
 class CmdMessenger(object):
     cmd_callbacks = {}
 
-    def __init__(self, stream, field=b',', cmd=b';', escape=b'\\'):
+    def __init__(self, stream, field=b',', cmd=b';', escape=b'/'):
         self.stream = stream
         self.field_sep = field
         self.cmd_sep = cmd
