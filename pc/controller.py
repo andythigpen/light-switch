@@ -1,5 +1,6 @@
 import serial
 from cmdmessenger import CmdMessenger
+import binascii
 
 s = serial.Serial('/dev/ttyUSB0', baudrate=115200, timeout=1)
 cmd = CmdMessenger(s)
@@ -24,6 +25,14 @@ def handle_status_event(cmd):
     nodeid = cmd.read_int8()
     vcc = cmd.read_int8()
     print("[{}] status: vcc {}".format(nodeid, vcc))
+
+@CmdMessenger.callback(cmdid=3)
+def handle_dump_settings(cmd):
+    nodeid = cmd.read_int8()
+    print("[{}] Dump settings:".format(nodeid))
+    settings = cmd.read_bytes()
+    settings = str(binascii.hexlify(settings), 'ascii')
+    print(':'.join(settings[i:i+2] for i in range(0, len(settings), 2)))
 
 while True:
     cmd.read()

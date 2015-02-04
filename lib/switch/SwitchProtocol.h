@@ -14,6 +14,8 @@ struct SwitchPacket {
         CONFIGURE_MPR121,
         CONFIGURE_RFM12B,
         PING,
+        DUMP_REQUEST,
+        DUMP_REPLY,
     };
     unsigned char type;
     unsigned char len;
@@ -52,6 +54,11 @@ struct SwitchConfigureRFM12B : SwitchPacket {
     SwitchConfigureRFM12B() :
         SwitchPacket(CONFIGURE_RFM12B, sizeof(SwitchConfigureRFM12B)) {}
     RFM12BSettings settings;
+};
+
+struct SwitchDumpSettings : SwitchPacket {
+    SwitchDumpSettings() : SwitchPacket(DUMP_REPLY, sizeof(SwitchDumpSettings)) {}
+    SwitchSettings settings;
 };
 
 #endif // SWITCHPROTOCOL_H

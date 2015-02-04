@@ -132,6 +132,18 @@ void handleReply() {
                 settingsChanged = true;
                 break;
             }
+            case SwitchPacket::DUMP_REQUEST: {
+                SwitchDumpSettings pkt;
+                Serial.println("dumping settings from EEPROM...");
+                EEPROM_readAnything(0, pkt.settings);
+                for (byte b = 0; b < sizeof(pkt.settings); ++b) {
+                    Serial.print(*((byte *)&pkt.settings + b), HEX);
+                    Serial.print(":");
+                }
+                Serial.println();
+                radio.Send(GATEWAYID, (const void*)(&pkt), sizeof(pkt), false);
+                break;
+            }
             case SwitchPacket::RESET: {
                 Serial.println("reset");
                 SwitchReset *pkt = (SwitchReset *)header;

@@ -16,6 +16,7 @@ RFM12B radio;
 #define CMD_MSG             0
 #define CMD_TOUCH_EVENT     1
 #define CMD_STATUS_EVENT    2
+#define CMD_DUMP_SETTINGS   3
 
 CmdMessenger cmd(Serial);
 
@@ -57,6 +58,18 @@ void handleStatusUpdate() {
     cmd.sendCmdEnd();
 }
 
+void handleSettingsDump() {
+    if (*radio.DataLen != sizeof(SwitchDumpSettings)) {
+        cmd.sendCmd(CMD_MSG, "bad settings dump payload");
+        return;
+    }
+    SwitchDumpSettings pkt = *(SwitchDumpSettings *)radio.Data;
+    cmd.sendCmdStart(CMD_DUMP_SETTINGS);
+    cmd.sendCmdArg(radio.GetSender());
+    cmd.sendCmdBinArg(pkt.settings);
+    cmd.sendCmdEnd();
+}
+
 void handleIncomingPacket() {
     if (!radio.CRCPass()) {
         return;
@@ -69,6 +82,9 @@ void handleIncomingPacket() {
             break;
         case SwitchPacket::STATUS_UPDATE:
             handleStatusUpdate();
+            break;
+        case SwitchPacket::DUMP_REPLY:
+            handleSettingsDump();
             break;
         default:
             cmd.sendCmd(CMD_MSG, "unknown event");
