@@ -49,7 +49,6 @@ struct SleepSettings {
 
 struct RFM12BSettings {
     byte nodeId;
-    byte freqBand;
     byte txPower;
     byte airKbps;
     byte lowVoltageThreshold;
@@ -67,6 +66,8 @@ struct SwitchSettings {
     struct Header {
         byte major;
         byte minor;
+
+        Header() : major(FIRMWARE_MAJOR_VERSION), minor(FIRMWARE_MINOR_VERSION) {}
     } header;
     RFM12BSettings rfm12b;
     MPR121Settings mpr121;

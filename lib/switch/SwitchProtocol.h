@@ -10,9 +10,7 @@ struct SwitchPacket {
         TOUCH_EVENT,
         STATUS_UPDATE,
         RESET,
-        CONFIGURE_SLEEP,
-        CONFIGURE_MPR121,
-        CONFIGURE_RFM12B,
+        CONFIGURE,
         PING,
         DUMP_REQUEST,
         DUMP_REPLY,
@@ -38,22 +36,14 @@ struct SwitchReset : SwitchPacket {
     unsigned char resetSettings;
 };
 
-struct SwitchConfigureSleep : SwitchPacket {
-    SwitchConfigureSleep() :
-        SwitchPacket(CONFIGURE_SLEEP, sizeof(SwitchConfigureSleep)) {}
-    SleepSettings settings;
+struct SwitchConfigureByte {
+    unsigned char offset;
+    unsigned char value;
 };
 
-struct SwitchConfigureMPR121 : SwitchPacket {
-    SwitchConfigureMPR121() :
-        SwitchPacket(CONFIGURE_MPR121, sizeof(SwitchConfigureMPR121)) {}
-    MPR121Settings settings;
-};
-
-struct SwitchConfigureRFM12B : SwitchPacket {
-    SwitchConfigureRFM12B() :
-        SwitchPacket(CONFIGURE_RFM12B, sizeof(SwitchConfigureRFM12B)) {}
-    RFM12BSettings settings;
+struct SwitchConfigure : SwitchPacket {
+    SwitchConfigure() : SwitchPacket(CONFIGURE, sizeof(SwitchConfigure)) {}
+    unsigned char cfg[0];
 };
 
 struct SwitchDumpSettings : SwitchPacket {

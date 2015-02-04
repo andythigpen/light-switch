@@ -18,9 +18,7 @@
 static const int mpr121Addr         = 0x5A;
 static const int mpr121IntPin       = 1;    // int 1 == pin 3
 
-static MPR121Settings mpr121Settings;
-static RFM12BSettings rfm12bSettings;
-static SleepSettings  sleepSettings;
+static SwitchSettings cfg;
 
 RFM12B radio;
 TouchSequence touch(mpr121Addr, mpr121IntPin);
@@ -53,55 +51,40 @@ void sleep(period_t time) {
 }
 
 void loadConfiguration() {
-    SwitchSettings::Header firmware;
-
     Serial.println("loadConfiguration:");
 
-    EEPROM_readAnything(0, firmware);
-    if (firmware.major != FIRMWARE_MAJOR_VERSION ||
-        firmware.minor != FIRMWARE_MINOR_VERSION) {
+    SwitchSettings current;
+    EEPROM_readAnything(0, current);
+    if (current.header.major != FIRMWARE_MAJOR_VERSION ||
+        current.header.minor != FIRMWARE_MINOR_VERSION) {
         Serial.println("loadConfiguration: no configuration");
-        return;
+        // save default settings
+        saveConfiguration(cfg);
     }
-
-    EEPROM_readAnything(offsetof(SwitchSettings, mpr121), mpr121Settings);
-    EEPROM_readAnything(offsetof(SwitchSettings, rfm12b), rfm12bSettings);
-    EEPROM_readAnything(offsetof(SwitchSettings, sleep), sleepSettings);
+    else
+        cfg = current;
 }
 
-void saveConfiguration() {
-    SwitchSettings settings;
+void saveConfiguration(SwitchSettings &settings) {
+    SwitchSettings current;
 
-    Serial.println("saveConfiguration:");
-
-    EEPROM_readAnything(0, settings);
-    if (settings.header.major != FIRMWARE_MAJOR_VERSION ||
-        settings.header.minor != FIRMWARE_MINOR_VERSION) {
-        Serial.println("updating firmware version...");
-        settings.header.major = FIRMWARE_MAJOR_VERSION;
-        settings.header.minor = FIRMWARE_MINOR_VERSION;
-        EEPROM_writeAnything(0, settings.header);
-    }
-    if (memcmp(&settings.mpr121, &mpr121Settings,
-                sizeof(mpr121Settings)) != 0) {
-        Serial.println("mpr121 settings changed, writing...");
-        EEPROM_writeAnything(offsetof(SwitchSettings, mpr121), mpr121Settings);
-    }
-    if (memcmp(&settings.rfm12b, &rfm12bSettings,
-                sizeof(rfm12bSettings)) != 0) {
-        Serial.println("rfm12b settings changed, writing...");
-        EEPROM_writeAnything(offsetof(SwitchSettings, rfm12b), rfm12bSettings);
-    }
-    if (memcmp(&settings.sleep, &sleepSettings, sizeof(sleepSettings)) != 0) {
-        Serial.println("sleep settings changed, writing...");
-        EEPROM_writeAnything(offsetof(SwitchSettings, sleep), sleepSettings);
+    EEPROM_readAnything(0, current);
+    byte *s = (byte *)&settings;
+    byte *c = (byte *)&current;
+    for (unsigned int i = 0; i < sizeof(SwitchSettings); ++i) {
+        if (c[i] == s[i])
+            continue;
+        Serial.print(i, HEX);
+        Serial.print(" - c: ");
+        Serial.print(c[i], HEX);
+        Serial.print("s: ");
+        Serial.println(s[i], HEX);
+        EEPROM.write(i, s[i]);
     }
 }
 
 void handleReply() {
     Serial.println("handleReply: ");
-    // unsigned char type = *(unsigned char *)radio.Data;
-    // unsigned char len = *(((unsigned char *)radio.Data) + 1);
     unsigned char *data = (unsigned char *)radio.Data;
     unsigned char offset = 0;
     bool settingsChanged = false;
@@ -111,24 +94,18 @@ void handleReply() {
             case SwitchPacket::PING:
                 Serial.println("ping");
                 break;
-            case SwitchPacket::CONFIGURE_MPR121: {
-                Serial.println("configure mpr121");
-                SwitchConfigureMPR121 *pkt = (SwitchConfigureMPR121 *)header;
-                mpr121Settings = pkt->settings;
-                settingsChanged = true;
-                break;
-            }
-            case SwitchPacket::CONFIGURE_SLEEP: {
-                Serial.println("configure sleep");
-                SwitchConfigureSleep *pkt = (SwitchConfigureSleep *)header;
-                sleepSettings = pkt->settings;
-                settingsChanged = true;
-                break;
-            }
-            case SwitchPacket::CONFIGURE_RFM12B: {
-                Serial.println("configure rfm12b");
-                SwitchConfigureRFM12B *pkt = (SwitchConfigureRFM12B *)header;
-                rfm12bSettings = pkt->settings;
+            case SwitchPacket::CONFIGURE: {
+                SwitchConfigure *pkt = (SwitchConfigure *)header;
+                SwitchConfigureByte *b = (SwitchConfigureByte *)pkt->cfg;
+                while (b < (SwitchConfigureByte *)((byte *)pkt + pkt->len)) {
+                    Serial.print("set ");
+                    Serial.print(b->offset, HEX);
+                    Serial.print(" : ");
+                    Serial.println(b->value, HEX);
+                    byte *settings = (byte *)&cfg;
+                    settings[b->offset] = b->value;
+                    b++;
+                }
                 settingsChanged = true;
                 break;
             }
@@ -164,21 +141,21 @@ void handleReply() {
     }
 
     if (settingsChanged) {
-        saveConfiguration();
+        saveConfiguration(cfg);
         softReset();
     }
 }
 
 void waitForReply(bool sleep = true) {
     long now = millis();
-    while (millis() - now <= sleepSettings.replyWakeLock) {
+    while (millis() - now <= cfg.sleep.replyWakeLock) {
         if (radio.ACKReceived(GATEWAYID)) {
             handleReply();
             break;
         }
     }
     if (sleep)
-        radio.Sleep(sleepSettings.statusInterval, sleepSettings.statusScaler);
+        radio.Sleep(cfg.sleep.statusInterval, cfg.sleep.statusScaler);
 }
 
 /* Sends a touch event to the base station */
@@ -219,7 +196,7 @@ void sendStatus() {
 
     radio.Wakeup();
     radio.Send(GATEWAYID, (const void*)(&pkt), sizeof(pkt), false);
-    radio.Sleep(sleepSettings.statusInterval, sleepSettings.statusScaler);
+    radio.Sleep(cfg.sleep.statusInterval, cfg.sleep.statusScaler);
 }
 
 void setup() {
@@ -235,12 +212,12 @@ void setup() {
     loadConfiguration();
 
     Serial.println("  * radio...");
-    radio.Initialize(rfm12bSettings.nodeId, DEFAULT_FREQ_BAND, NETWORKID);
+    radio.Initialize(cfg.rfm12b.nodeId, DEFAULT_FREQ_BAND, NETWORKID);
     /* radio.Encrypt(KEY); */
-    radio.Sleep(sleepSettings.statusInterval, sleepSettings.statusScaler);
+    radio.Sleep(cfg.sleep.statusInterval, cfg.sleep.statusScaler);
 
     Serial.println("  * touch sensor...");
-    touch.begin(mpr121Settings);
+    touch.begin(cfg.mpr121);
 
     // proximity thresholds
     touch.setTouchThreshold(2, 12);
@@ -262,11 +239,11 @@ void loop() {
         // either a touch or release event woke us up
         touch.update();
         if (touch.isTouched())
-            sleepPeriod = (period_t)sleepSettings.touch;
+            sleepPeriod = (period_t)cfg.sleep.touch;
         else if (touch.isProximity())
-            sleepPeriod = (period_t)sleepSettings.proximity;
+            sleepPeriod = (period_t)cfg.sleep.proximity;
         else
-            sleepPeriod = (period_t)sleepSettings.release;
+            sleepPeriod = (period_t)cfg.sleep.release;
         touch.wakeUp();
         touch.enableInterrupt();
     }
@@ -276,7 +253,7 @@ void loop() {
         touch.update();
         Serial.println("repeat:");
         handleEvent(1);
-        sleepPeriod = (period_t)sleepSettings.repeat;
+        sleepPeriod = (period_t)cfg.sleep.repeat;
     }
     else {
         // no touch interrupt, no current touch - this is a timeout.
