@@ -10,8 +10,15 @@ if [ -z "$NETWORKID" ]; then
     echo "defaulting to network id: $NETWORKID"
 fi
 
+if [ -n "$NODEID" ]; then
+    echo "default node id: $NODEID"
+    NODEID="-DDEFAULT_NODEID=$NODEID"
+else
+    echo "no node id specified"
+fi
+
 echo "building..."
-ino build -f "-DNETWORKID=$NETWORKID \
+ino build -f "-DNETWORKID=$NETWORKID $NODEID \
               -ffunction-sections -fdata-sections -g -Os -w" || die
 
 if [ "$1" != "-n" ]; then

@@ -11,7 +11,9 @@
 
 // RFM12B default settings
 #define GATEWAYID           1
+#ifndef DEFAULT_NODEID
 #define DEFAULT_NODEID      127
+#endif
 #define DEFAULT_FREQ_BAND   RF12_915MHZ
 
 
