@@ -50,21 +50,6 @@ void sleep(period_t time) {
         LowPower.powerStandby(time, ADC_OFF, BOD_OFF);
 }
 
-void loadConfiguration() {
-    Serial.println("loadConfiguration:");
-
-    SwitchSettings current;
-    EEPROM_readAnything(0, current);
-    if (current.header.major != FIRMWARE_MAJOR_VERSION ||
-        current.header.minor != FIRMWARE_MINOR_VERSION) {
-        Serial.println("loadConfiguration: no configuration");
-        // save default settings
-        saveConfiguration(cfg);
-    }
-    else
-        cfg = current;
-}
-
 void saveConfiguration(SwitchSettings &settings) {
     SwitchSettings current;
 
@@ -81,6 +66,21 @@ void saveConfiguration(SwitchSettings &settings) {
         Serial.println(s[i], HEX);
         EEPROM.write(i, s[i]);
     }
+}
+
+void loadConfiguration() {
+    Serial.println("loadConfiguration:");
+
+    SwitchSettings current;
+    EEPROM_readAnything(0, current);
+    if (current.header.major != FIRMWARE_MAJOR_VERSION ||
+        current.header.minor != FIRMWARE_MINOR_VERSION) {
+        Serial.println("loadConfiguration: no configuration");
+        // save default settings
+        saveConfiguration(cfg);
+    }
+    else
+        cfg = current;
 }
 
 void handleReply() {

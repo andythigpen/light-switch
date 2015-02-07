@@ -27,17 +27,6 @@ struct {
     byte pkt[256];
 } command;
 
-void setup() {
-    Serial.begin(115200);
-    radio.Initialize(NODEID, FREQUENCY, NETWORKID);
-
-    cmd.attach(onUnknownCommand);
-    cmd.attach(CMD_RESET, onResetCommand);
-    cmd.attach(CMD_DUMP_SETTINGS, onDumpCommand);
-    cmd.attach(CMD_SET_BYTE, onSetByteCommand);
-    cmd.sendCmd(CMD_MSG, "Initialized...");
-}
-
 void onUnknownCommand() {
     cmd.sendCmd(CMD_MSG, "Unknown command");
 }
@@ -79,6 +68,17 @@ void onSetByteCommand() {
     cmd.sendCmdStart(CMD_ACK);
     cmd.sendCmdfArg("%c %c %c", nodeId, offset, value);
     cmd.sendCmdEnd();
+}
+
+void setup() {
+    Serial.begin(115200);
+    radio.Initialize(NODEID, FREQUENCY, NETWORKID);
+
+    cmd.attach(onUnknownCommand);
+    cmd.attach(CMD_RESET, onResetCommand);
+    cmd.attach(CMD_DUMP_SETTINGS, onDumpCommand);
+    cmd.attach(CMD_SET_BYTE, onSetByteCommand);
+    cmd.sendCmd(CMD_MSG, "Initialized...");
 }
 
 void handleTouchEvent(byte nodeId) {
