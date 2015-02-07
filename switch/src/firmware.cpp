@@ -62,10 +62,11 @@ void saveConfiguration(SwitchSettings &settings) {
     for (unsigned int i = 0; i < sizeof(SwitchSettings); ++i) {
         if (c[i] == s[i])
             continue;
+        DEBUG_("byte [");
         DEBUG_FMT_(i, HEX);
-        DEBUG_(" - c: ");
+        DEBUG_("] current: ");
         DEBUG_FMT_(c[i], HEX);
-        DEBUG_("s: ");
+        DEBUG_(" new: ");
         DEBUG_FMT(s[i], HEX);
         EEPROM.write(i, s[i]);
     }
