@@ -17,8 +17,14 @@ else
     echo "no node id specified"
 fi
 
+if [ -z "$DEBUG" ]; then
+    DEBUG="-DNDEBUG"
+else
+    DEBUG=""
+fi
+
 echo "building..."
-ino build -f "-DNETWORKID=$NETWORKID $NODEID \
+ino build -f "-DNETWORKID=$NETWORKID $NODEID $DEBUG \
               -ffunction-sections -fdata-sections -g -Os -w" || die
 
 if [ "$1" != "-n" ]; then

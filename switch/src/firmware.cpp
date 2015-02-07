@@ -10,6 +10,7 @@
 #include "SwitchProtocol.h"
 #include "SwitchSettings.h"
 #include "util.h"
+#include "debug.h"
 
 #ifndef NETWORKID
 #error "NETWORKID must be defined!"
@@ -27,18 +28,20 @@ period_t sleepPeriod = SLEEP_FOREVER;
 extern long readVcc();
 
 void softReset() {
-    Serial.println("softReset:");
+#if !defined(NDEBUG)
+    DEBUG("softReset:");
     Serial.flush();
+#endif
     asm volatile ("  jmp 0");
 }
 
 void sleep(period_t time) {
-    Serial.print("sleep: ");
-    Serial.println(time);
-
+#if !defined(NDEBUG)
+    DEBUG("sleep: ", time);
     // flush serial for debugging before powering down
     Serial.flush();
     delay(100);
+#endif
 
     // turn off the wdt in case it was previously set...this is to prevent a
     // spurious wakeup after an interrupt and then sleep forever call.
@@ -59,23 +62,23 @@ void saveConfiguration(SwitchSettings &settings) {
     for (unsigned int i = 0; i < sizeof(SwitchSettings); ++i) {
         if (c[i] == s[i])
             continue;
-        Serial.print(i, HEX);
-        Serial.print(" - c: ");
-        Serial.print(c[i], HEX);
-        Serial.print("s: ");
-        Serial.println(s[i], HEX);
+        DEBUG_FMT_(i, HEX);
+        DEBUG_(" - c: ");
+        DEBUG_FMT_(c[i], HEX);
+        DEBUG_("s: ");
+        DEBUG_FMT(s[i], HEX);
         EEPROM.write(i, s[i]);
     }
 }
 
 void loadConfiguration() {
-    Serial.println("loadConfiguration:");
+    DEBUG("loadConfiguration:");
 
     SwitchSettings current;
     EEPROM_readAnything(0, current);
     if (current.header.major != FIRMWARE_MAJOR_VERSION ||
         current.header.minor != FIRMWARE_MINOR_VERSION) {
-        Serial.println("loadConfiguration: no configuration");
+        DEBUG("loadConfiguration: no configuration");
         // save default settings
         saveConfiguration(cfg);
     }
@@ -84,7 +87,7 @@ void loadConfiguration() {
 }
 
 void handleReply() {
-    Serial.println("handleReply: ");
+    DEBUG("handleReply: ");
     unsigned char *data = (unsigned char *)radio.Data;
     unsigned char offset = 0;
     bool settingsChanged = false;
@@ -92,16 +95,16 @@ void handleReply() {
         SwitchPacket *header = (SwitchPacket *)(data + offset);
         switch (header->type) {
             case SwitchPacket::PING:
-                Serial.println("ping");
+                DEBUG("ping");
                 break;
             case SwitchPacket::CONFIGURE: {
                 SwitchConfigure *pkt = (SwitchConfigure *)header;
                 SwitchConfigureByte *b = (SwitchConfigureByte *)pkt->cfg;
                 while (b < (SwitchConfigureByte *)((byte *)pkt + pkt->len)) {
-                    Serial.print("set ");
-                    Serial.print(b->offset, HEX);
-                    Serial.print(" : ");
-                    Serial.println(b->value, HEX);
+                    DEBUG_("set ");
+                    DEBUG_FMT_(b->offset, HEX);
+                    DEBUG_(" : ");
+                    DEBUG_FMT(b->value, HEX);
                     byte *settings = (byte *)&cfg;
                     settings[b->offset] = b->value;
                     b++;
@@ -111,21 +114,21 @@ void handleReply() {
             }
             case SwitchPacket::DUMP_REQUEST: {
                 SwitchDumpSettings pkt;
-                Serial.println("dumping settings from EEPROM...");
+                DEBUG("dumping settings from EEPROM...");
                 EEPROM_readAnything(0, pkt.settings);
                 for (byte b = 0; b < sizeof(pkt.settings); ++b) {
-                    Serial.print(*((byte *)&pkt.settings + b), HEX);
-                    Serial.print(":");
+                    DEBUG_FMT_(*((byte *)&pkt.settings + b), HEX);
+                    DEBUG_(":");
                 }
-                Serial.println();
+                DEBUG("");
                 radio.Send(GATEWAYID, (const void*)(&pkt), sizeof(pkt), false);
                 break;
             }
             case SwitchPacket::RESET: {
-                Serial.println("reset");
+                DEBUG("reset");
                 SwitchReset *pkt = (SwitchReset *)header;
                 if (pkt->resetSettings) {
-                    Serial.println("resetting settings");
+                    DEBUG("resetting settings");
                     byte v = 255;
                     EEPROM_writeAnything(0, v);
                 }
@@ -133,8 +136,7 @@ void handleReply() {
                 break;
             }
             default:
-                Serial.print("Unknown type: ");
-                Serial.println(header->type);
+                DEBUG("Unknown type: ", header->type);
                 break;
         }
         offset += header->len;
@@ -164,24 +166,24 @@ void handleEvent(byte repeated) {
     pkt.gesture = touch.getGesture();
     pkt.electrode = touch.getLastTouch();
     pkt.repeat = repeated;
+#if !defined(NDEBUG)
     switch (pkt.gesture) {
-        case TOUCH_SWIPE_DOWN:  Serial.println("swipe down");   break;
-        case TOUCH_SWIPE_UP:    Serial.println("swipe up");     break;
-        case TOUCH_SWIPE_LEFT:  Serial.println("swipe left");   break;
-        case TOUCH_SWIPE_RIGHT: Serial.println("swipe right");  break;
-        case TOUCH_PROXIMITY:   Serial.println("proximity");    break;
+        case TOUCH_SWIPE_DOWN:  DEBUG("swipe down");   break;
+        case TOUCH_SWIPE_UP:    DEBUG("swipe up");     break;
+        case TOUCH_SWIPE_LEFT:  DEBUG("swipe left");   break;
+        case TOUCH_SWIPE_RIGHT: DEBUG("swipe right");  break;
+        case TOUCH_PROXIMITY:   DEBUG("proximity");    break;
         case TOUCH_TAP:
-            Serial.print("tap ");
-            Serial.println(pkt.electrode);
+            DEBUG("tap ", pkt.electrode);
             break;
         case TOUCH_DOUBLE_TAP:
-            Serial.print("double tap ");
-            Serial.println(pkt.electrode);
+            DEBUG("double tap ", pkt.electrode);
             break;
         default:
-            Serial.println("no gesture");
+            DEBUG("no gesture");
             return;
     }
+#endif
     radio.Wakeup();
     radio.Send(GATEWAYID, (const void*)(&pkt), sizeof(pkt), !repeated);
     if (!repeated)
@@ -191,8 +193,7 @@ void handleEvent(byte repeated) {
 void sendStatus() {
     SwitchStatus pkt;
     pkt.batteryLevel = readVcc();
-    Serial.print("vcc: ");
-    Serial.println(pkt.batteryLevel);
+    DEBUG("vcc: ", pkt.batteryLevel);
 
     radio.Wakeup();
     radio.Send(GATEWAYID, (const void*)(&pkt), sizeof(pkt), false);
@@ -203,7 +204,7 @@ void setup() {
     // initialize serial
     Serial.begin(115200);
     while (!Serial);
-    Serial.println("initializing...");
+    DEBUG("initializing...");
 
     // D5 GND for electrodes
     //pinMode(5, OUTPUT);
@@ -211,12 +212,12 @@ void setup() {
 
     loadConfiguration();
 
-    Serial.println("  * radio...");
+    DEBUG("  * radio...");
     radio.Initialize(cfg.rfm12b.nodeId, DEFAULT_FREQ_BAND, NETWORKID);
     /* radio.Encrypt(KEY); */
     radio.Sleep(cfg.sleep.statusInterval, cfg.sleep.statusScaler);
 
-    Serial.println("  * touch sensor...");
+    DEBUG("  * touch sensor...");
     touch.begin(cfg.mpr121);
 
     // proximity thresholds
@@ -251,7 +252,7 @@ void loop() {
         // we woke up w/o an interrupt, but an electrode or proximity sensor
         // is still being touched - this is a repeat event
         touch.update();
-        Serial.println("repeat:");
+        DEBUG("repeat:");
         handleEvent(1);
         sleepPeriod = (period_t)cfg.sleep.repeat;
     }
@@ -261,8 +262,8 @@ void loop() {
         handleEvent(0);
         touch.clear();
         touch.sleep();
-        Serial.println("touch done:");
-        Serial.println();
+        DEBUG("touch done:");
+        DEBUG("");
         sleepPeriod = SLEEP_FOREVER;
     }
 }
