@@ -30,11 +30,6 @@ struct Electrodes {
     byte center;
 };
 
-enum SleepMode {
-    LOW_POWER_MODE,
-    HIGH_SAMPLING_MODE,
-};
-
 class TouchSequence {
     public:
         // Constructor
@@ -53,14 +48,6 @@ class TouchSequence {
         //  total:      the number of electrodes to enable
         //  electrodes: directional electrodes used for gestures
         void setElectrodes(byte total, Electrodes &electrodes);
-
-        // conserves power by reducing the sampling rate, filter rate of
-        // the MPR121 to a lower level.
-        // once an event is detected wakeUp should be called if the sampling
-        // rate is too low to detect multiple events
-        void sleep();
-        // resets the MPR121 sampling/filter rates to the defaults
-        void wakeUp();
 
         // checks the sensors for any new inputs and adds them to the touch
         // sequence
@@ -132,7 +119,6 @@ class TouchSequence {
         struct Electrodes electrodes;
 
         bool running;
-        SleepMode sleepMode;
 
         struct {
             byte address;

@@ -227,7 +227,6 @@ void setup() {
     touch.run();
 
     touch.enableInterrupt();
-    touch.sleep();
     touch.dump();
 }
 
@@ -247,7 +246,7 @@ void loop() {
             sleepPeriod = (period_t)cfg.sleep.proximity;
         else
             sleepPeriod = (period_t)cfg.sleep.release;
-        touch.wakeUp();
+        DEBUG("event: ", millis());
         touch.enableInterrupt();
     }
     else if (touch.isTouched() || touch.isProximity()) {
@@ -263,8 +262,7 @@ void loop() {
         // handle the event and then clear everything to reset.
         handleEvent(0);
         touch.clear();
-        touch.sleep();
-        DEBUG("touch done:");
+        DEBUG("touch done:", millis());
         DEBUG("");
         sleepPeriod = SLEEP_FOREVER;
     }

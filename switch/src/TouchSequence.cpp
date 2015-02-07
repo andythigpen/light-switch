@@ -210,34 +210,6 @@ TouchSequence::setElectrodes(byte total, struct Electrodes &electrodes)
 }
 
 void
-TouchSequence::sleep()
-{
-#if 0
-    DEBUG("sleep:");
-    if (sleepMode == LOW_POWER_MODE)
-        return;
-    MPR121ConfigLock lock(this);
-    //setRegister(AFE1, 0x3F);
-    setRegister(AFE2, 0x25);
-    sleepMode = LOW_POWER_MODE;
-#endif
-}
-
-void
-TouchSequence::wakeUp()
-{
-#if 0
-    DEBUG("wakeUp:");
-    if (sleepMode != LOW_POWER_MODE)
-        return;
-    MPR121ConfigLock lock(this);
-    //setRegister(AFE1, 0xFF);
-    setRegister(AFE2, 0x38);
-    sleepMode = HIGH_SAMPLING_MODE;
-#endif
-}
-
-void
 TouchSequence::stop()
 {
     DEBUG("stop:");
