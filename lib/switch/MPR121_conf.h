@@ -47,7 +47,7 @@ struct MPR121Settings {
 
     MPR121Settings() :
         electrodes(5),
-        proximityMode(2),
+        proximityMode(0),
         debounce(0x11),
         afe1(0x3F),
         afe2(0x24),

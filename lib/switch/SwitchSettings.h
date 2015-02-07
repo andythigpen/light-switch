@@ -39,7 +39,7 @@ struct SleepSettings {
 
     SleepSettings() :
         touch(SLEEP_500MS),
-        release(SLEEP_250MS),
+        release(SLEEP_120MS),
         proximity(SLEEP_1S),
         repeat(SLEEP_250MS),
         replyWakeLock(30),      // keep mcu awake at most 30ms for ACK replies
