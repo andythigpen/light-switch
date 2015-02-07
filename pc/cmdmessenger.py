@@ -53,7 +53,7 @@ class CmdMessengerWriter(object):
         self._send_unescaped_field(int(arg))
 
     def send_char(self, arg):
-        self._send_unescaped_field(chr(arg))
+        self._send_field(bytes([ord(chr(arg))]))
 
     def send_float(self, arg):
         self._send_unescaped_field(float(arg))
