@@ -47,7 +47,7 @@ static void wakeUpInt1() {
 
 TouchSequence::TouchSequence(byte mpr121Addr, byte interruptPin) :
     interruptPin(interruptPin), idx(0),
-    proximityEvent(false), running(false), sleepMode(HIGH_SAMPLING_MODE)
+    proximityEvent(false), running(true)
 {
     mpr121.address    = mpr121Addr;
     electrodes.top    = ELECTRODE_TOP;
@@ -63,6 +63,7 @@ TouchSequence::begin(MPR121Settings &defaultSettings)
     DEBUG("starting Wire library");
     Wire.begin();
 
+    stop();
     applySettings(defaultSettings);
     setTouchThreshold(defaultSettings.touch);
     setReleaseThreshold(defaultSettings.release);
@@ -96,21 +97,27 @@ TouchSequence::setRegister(byte reg, byte val)
 {
     MPR121ConfigLock lock(this, reg != ECR && (reg < 0x72 || reg > 0x7A));
 
+#if defined(DEBUG_REGISTERS)
     DEBUG_("setRegister: 0x");
     DEBUG_FMT_(reg, HEX);
+#endif
 
     Wire.beginTransmission(mpr121.address);
     Wire.write(reg);
     Wire.write(val);
     byte errorCode = Wire.endTransmission();
 
+#if defined(DEBUG_REGISTERS)
     DEBUG_(" : 0x");
     DEBUG_FMT(val, HEX);
+#endif
 
     // automatically update the running flag if ECR is set
     if (errorCode == 0 && reg == ECR) {
         running = val & 0x3F;
+#if defined(DEBUG_REGISTERS)
         DEBUG("setRegister: ", running ? "running" : "not running");
+#endif
     }
 
     return errorCode == 0;
@@ -402,6 +409,7 @@ TouchSequence::getGesture()
 void
 TouchSequence::enableInterrupt()
 {
+    DEBUG("enableInterrupt:");
     if (interruptPin)
         attachInterrupt(interruptPin, wakeUpInt1, LOW);
     else
