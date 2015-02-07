@@ -43,8 +43,8 @@ struct SleepSettings {
         proximity(SLEEP_1S),
         repeat(SLEEP_250MS),
         replyWakeLock(30),      // keep mcu awake at most 30ms for ACK replies
-        statusInterval(110),    // 150 * 2^11 = 3,604,480 ms ~= 1 hr
-        statusScaler(15)
+        statusInterval(110),    // interval * 2^scaler = status update time (ms)
+        statusScaler(15)        // 110 * 2^15 = 3,604,480 ms ~= 1 hr
     {
     }
 };

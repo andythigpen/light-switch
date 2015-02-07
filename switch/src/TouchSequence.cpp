@@ -63,10 +63,6 @@ TouchSequence::begin(MPR121Settings &defaultSettings)
     DEBUG("starting Wire library");
     Wire.begin();
 
-    // mpr121.ele_en = electrodes & 0x0F;
-    // mpr121.eleprox_en = proximityMode & 0x03;
-    // mpr121.cl = 2;
-
     applySettings(defaultSettings);
     setTouchThreshold(defaultSettings.touch);
     setReleaseThreshold(defaultSettings.release);
@@ -85,75 +81,14 @@ TouchSequence::dump()
     DEBUG("Registers: ");
     for (int i = 0; i < 0x7F; ++i) {
         if (i % 8 == 0)
-            DEBUG_("0x0", i, " ");
+            DEBUG_(i, ": ");
         DEBUG_FMT_(getRegister(i), HEX);
         if (i % 8 == 7)
             DEBUG("");
         else
             DEBUG_(" ");
     }
-#if 0
-    DEBUG_("Touch status: ");
-    DEBUG_FMT_(getRegister(0), HEX);
-    DEBUG_(" ");
-    DEBUG_FMT(getRegister(1), HEX);
-
-    DEBUG("Filter status: ");
-    for (int i = 0x04; i < 0x1E; i += 2) {
-        DEBUG_FMT_((int)getRegister(i + 1) << 8 | getRegister(i), DEC);
-        DEBUG_(" ");
-    }
     DEBUG("");
-
-    DEBUG("Baseline: ");
-    for (int i = 0x1E; i < 0x2B; ++i) {
-        DEBUG_FMT_(getRegister(i), DEC);
-        DEBUG_(" ");
-    }
-    DEBUG("");
-
-    DEBUG("Filters:");
-    for (int i = 0x2B; i < 0x41; ++i) {
-        DEBUG_FMT_(getRegister(i), HEX);
-        DEBUG_(" ");
-    }
-    DEBUG("");
-
-    DEBUG("Thresholds:");
-    for (int i = 0x41; i < 0x5B; ++i) {
-        DEBUG_FMT_(getRegister(i), HEX);
-        DEBUG_(" ");
-    }
-    DEBUG("");
-
-    DEBUG("Conf:");
-    for (int i = 0x5B; i < 0x5F; ++i) {
-        DEBUG_FMT_(getRegister(i), HEX);
-        DEBUG_(" ");
-    }
-    DEBUG("");
-
-    DEBUG("CDC:");
-    for (int i = 0x5F; i < 0x6C; ++i) {
-        DEBUG_FMT_(getRegister(i), HEX);
-        DEBUG_(" ");
-    }
-    DEBUG("");
-
-    DEBUG("CDT:");
-    for (int i = 0x6C; i < 0x72; ++i) {
-        DEBUG_FMT_(getRegister(i), HEX);
-        DEBUG_(" ");
-    }
-    DEBUG("");
-
-    DEBUG("AC:");
-    for (int i = 0x7B; i < 0x80; ++i) {
-        DEBUG_FMT_(getRegister(i), HEX);
-        DEBUG_(" ");
-    }
-    DEBUG("");
-#endif
 }
 
 bool

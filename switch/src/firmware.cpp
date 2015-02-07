@@ -221,8 +221,10 @@ void setup() {
     touch.begin(cfg.mpr121);
 
     // proximity thresholds
+    touch.stop();
     touch.setTouchThreshold(2, 12);
     touch.setReleaseThreshold(1, 12);
+    touch.run();
 
     touch.enableInterrupt();
     touch.sleep();
