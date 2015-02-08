@@ -49,9 +49,9 @@ void onDumpCommand() {
 }
 
 void onSetByteCommand() {
-    byte nodeId = (byte)cmd.readCharArg();
-    byte offset = (byte)cmd.readCharArg();
-    byte value = (byte)cmd.readCharArg();
+    byte nodeId = (byte)cmd.readInt16Arg();
+    byte offset = (byte)cmd.readInt16Arg();
+    byte value = (byte)cmd.readInt16Arg();
     SwitchConfigure *pkt = (SwitchConfigure *)&command.pkt;
     if (nodeId == command.nodeId && pkt->type == SwitchPacket::CONFIGURE) {
         byte *p = (byte *)pkt;
@@ -66,7 +66,9 @@ void onSetByteCommand() {
         pkt->cfg[1] = value;
     }
     cmd.sendCmdStart(CMD_ACK);
-    cmd.sendCmdfArg("%c %c %c", nodeId, offset, value);
+    cmd.sendCmdArg(nodeId);
+    cmd.sendCmdArg(offset);
+    cmd.sendCmdArg(value);
     cmd.sendCmdEnd();
 }
 

@@ -13,6 +13,24 @@ class Command:
     RESET           = 5
     SET_BYTE        = 6
 
+electrodes = [
+    "top",
+    "left",
+    "bottom",
+    "right",
+    "center",
+]
+
+gestures = [
+    "unknown",
+    "tap",
+    "double_tap",
+    "swipe_up",
+    "swipe_down",
+    "swipe_left",
+    "swipe_right",
+]
+
 ack_condition = threading.Condition()
 ack_msg = None
 
@@ -31,10 +49,10 @@ def handle_ack(msg):
 @CmdMessenger.callback(cmdid=Command.TOUCH_EVENT)
 def handle_touch_event(msg):
     nodeid = msg.read_int8()
-    gesture = msg.read_int8()
-    electrode = msg.read_int8()
+    gesture = gestures[msg.read_int8()]
+    electrode = electrodes[msg.read_int8()]
     repeat = msg.read_int8()
-    print('[{}] gesture: {}, electrode: {} repeat: {}'.format(nodeid,
+    print('[{}] gesture: {}, electrode: {}, repeat: {}'.format(nodeid,
         gesture, electrode, repeat))
 
 @CmdMessenger.callback(cmdid=Command.STATUS_EVENT)
@@ -49,7 +67,9 @@ def handle_dump_settings(msg):
     print("[{}] Dump settings:".format(nodeid))
     settings = msg.read_bytes()
     settings = str(binascii.hexlify(settings), 'ascii')
-    print(':'.join(settings[i:i+2] for i in range(0, len(settings), 2)))
+    settings = [settings[i:i+2] for i in range(0, len(settings), 2)]
+    for i in range(0, len(settings), 8):
+        print('{:#04x}: {}'.format(i, ' '.join(settings[i:i+8])))
 
 
 class SerialInputThread(threading.Thread):
@@ -151,15 +171,17 @@ class ControllerShell(cmd.Cmd):
         if not nodeid or not offset or not value:
             print('Missing required argument')
             return
-        print('{} {} {}'.format(int(nodeid), int(offset, 0), int(value, 0)))
         with self.msg.writer(cmdid=Command.SET_BYTE) as w:
-            w.send_char(int(nodeid))
-            w.send_char(int(offset, 0))
-            w.send_char(int(value, 0))
+            w.send_int8(int(nodeid))
+            w.send_int8(int(offset, 0))
+            w.send_int8(int(value, 0))
         msg = self.input_thread.wait_for_ack(1.0)
         if msg:
             print('Tap switch {} to set configuration.'.format(nodeid))
-            print(msg.read_str())
+            n = msg.read_int8()
+            o = msg.read_int8()
+            v = msg.read_int8()
+            print('nodeid:{} offset:{:#04x} value:{:#04x}'.format(n,o,v))
         else:
             print('No ACK received')
 

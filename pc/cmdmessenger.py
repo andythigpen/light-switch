@@ -70,7 +70,7 @@ class CmdMessengerWriter(object):
 
 class CmdMessengerReader(object):
     def __init__(self, cmd, field_sep, cmd_sep, escape_sep):
-        self.cmd = cmd
+        self.cmd = cmd.copy()
         self.field_sep = field_sep
         self.cmd_sep = cmd_sep
         self.escape_sep = escape_sep
