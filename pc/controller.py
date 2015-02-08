@@ -12,6 +12,8 @@ class Command:
     DUMP_SETTINGS   = 4
     RESET           = 5
     SET_BYTE        = 6
+    GET_I2C         = 7
+    SET_I2C         = 8
 
 electrodes = [
     "top",
@@ -172,7 +174,7 @@ class ControllerShell(cmd.Cmd):
             print('Missing required argument')
             return
         with self.msg.writer(cmdid=Command.SET_BYTE) as w:
-            w.send_int8(int(nodeid))
+            w.send_int8(int(nodeid, 0))
             w.send_int8(int(offset, 0))
             w.send_int8(int(value, 0))
         msg = self.input_thread.wait_for_ack(1.0)
@@ -182,6 +184,58 @@ class ControllerShell(cmd.Cmd):
             o = msg.read_int8()
             v = msg.read_int8()
             print('nodeid:{} offset:{:#04x} value:{:#04x}'.format(n,o,v))
+        else:
+            print('No ACK received')
+
+    def do_geti2c(self, args):
+        '''Gets an I2C register value, given nodeid, address, register:
+           geti2c 2 0x5A 0x20'''
+        nodeid, args = args.partition(' ')[::2]
+        address, args = args.partition(' ')[::2]
+        register, args = args.partition(' ')[::2]
+        if not nodeid or not address or not register:
+            print('Missing required argument')
+            return
+        with self.msg.writer(cmdid=Command.GET_I2C) as w:
+            w.send_int8(int(nodeid, 0))
+            w.send_int8(int(address, 0))
+            w.send_int8(int(register, 0))
+        print('Tap switch {} to get register.'.format(nodeid))
+        msg = self.input_thread.wait_for_ack(10.0)
+        if msg:
+            n = msg.read_int8()
+            a = msg.read_int8()
+            r = msg.read_int8()
+            v = msg.read_int8()
+            print('nodeid:{} address:{:#04x} register:{:#04x} value:{:#04x}'.format(
+                n,a,r,v))
+        else:
+            print('No ACK received')
+
+    def do_seti2c(self, args):
+        '''Sets an I2C register value, given nodeid, address, register, value:
+           geti2c 2 0x5A 0x20 0x12'''
+        nodeid, args = args.partition(' ')[::2]
+        address, args = args.partition(' ')[::2]
+        register, args = args.partition(' ')[::2]
+        value, args = args.partition(' ')[::2]
+        if not nodeid or not address or not register or not value:
+            print('Missing required argument')
+            return
+        with self.msg.writer(cmdid=Command.SET_I2C) as w:
+            w.send_int8(int(nodeid, 0))
+            w.send_int8(int(address, 0))
+            w.send_int8(int(register, 0))
+            w.send_int8(int(value, 0))
+        msg = self.input_thread.wait_for_ack(10.0)
+        if msg:
+            print('Tap switch {} to set register.'.format(nodeid))
+            n = msg.read_int8()
+            a = msg.read_int8()
+            r = msg.read_int8()
+            v = msg.read_int8()
+            print('nodeid:{} address:{:#04x} register:{:#04x} value:{:#04x}'.format(
+                n,a,r,v))
         else:
             print('No ACK received')
 

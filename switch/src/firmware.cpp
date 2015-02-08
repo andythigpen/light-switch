@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <avr/wdt.h>
 #include <EEPROM.h>
+#include <Wire.h>
 #include "LowPower.h"
 #include "TouchSequence.h"
 #include "RFM12B.h"
@@ -134,6 +135,41 @@ void handleReply() {
                     EEPROM_writeAnything(0, v);
                 }
                 softReset();
+                break;
+            }
+            case SwitchPacket::I2C_REQUEST: {
+                SwitchI2CRequest *request = (SwitchI2CRequest *)header;
+                SwitchI2CReply reply;
+
+                Wire.beginTransmission(request->address);
+                Wire.write(request->reg);
+                Wire.endTransmission(false);
+                Wire.requestFrom(request->address, (byte)1);
+                Wire.endTransmission();
+
+                reply.address = request->address;
+                reply.reg = request->reg;
+                reply.val = Wire.read();
+                DEBUG("i2c request: ", reply.address, " ", reply.reg, " ",
+                        reply.val);
+                radio.Send(GATEWAYID, (const void*)(&reply), sizeof(reply), false);
+                break;
+            }
+            case SwitchPacket::I2C_SET: {
+                SwitchI2CSet *pkt = (SwitchI2CSet *)header;
+                bool success = false;
+                DEBUG("i2c set: ", pkt->address, " ", pkt->reg, " ", pkt->val);
+                if (pkt->address == mpr121Addr) {
+                    success = touch.setRegister(pkt->reg, pkt->val);
+                }
+                else {
+                    Wire.beginTransmission(pkt->address);
+                    Wire.write(pkt->reg);
+                    Wire.write(pkt->val);
+                    byte errorCode = Wire.endTransmission();
+                    success = errorCode == 0;
+                }
+                DEBUG("i2c set: ", success ? "success" : "error");
                 break;
             }
             default:

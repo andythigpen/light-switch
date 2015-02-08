@@ -20,6 +20,8 @@ RFM12B radio;
 #define CMD_DUMP_SETTINGS   4
 #define CMD_RESET           5
 #define CMD_SET_BYTE        6
+#define CMD_GET_I2C         7
+#define CMD_SET_I2C         8
 
 CmdMessenger cmd(Serial);
 struct {
@@ -72,6 +74,38 @@ void onSetByteCommand() {
     cmd.sendCmdEnd();
 }
 
+void onGetI2C() {
+    byte nodeId = (byte)cmd.readInt16Arg();
+    byte address = (byte)cmd.readInt16Arg();
+    byte reg = (byte)cmd.readInt16Arg();
+    SwitchI2CRequest *pkt = (SwitchI2CRequest *)&command.pkt;
+    command.nodeId = nodeId;
+    pkt->type = SwitchPacket::I2C_REQUEST;
+    pkt->len = sizeof(SwitchI2CRequest);
+    pkt->address = address;
+    pkt->reg = reg;
+}
+
+void onSetI2C() {
+    byte nodeId = (byte)cmd.readInt16Arg();
+    byte address = (byte)cmd.readInt16Arg();
+    byte reg = (byte)cmd.readInt16Arg();
+    byte val = (byte)cmd.readInt16Arg();
+    SwitchI2CSet *pkt = (SwitchI2CSet *)&command.pkt;
+    command.nodeId = nodeId;
+    pkt->type = SwitchPacket::I2C_SET;
+    pkt->len = sizeof(SwitchI2CSet);
+    pkt->address = address;
+    pkt->reg = reg;
+    pkt->val = val;
+    cmd.sendCmdStart(CMD_ACK);
+    cmd.sendCmdArg(nodeId);
+    cmd.sendCmdArg(address);
+    cmd.sendCmdArg(reg);
+    cmd.sendCmdArg(val);
+    cmd.sendCmdEnd();
+}
+
 void setup() {
     Serial.begin(115200);
     radio.Initialize(NODEID, FREQUENCY, NETWORKID);
@@ -80,6 +114,8 @@ void setup() {
     cmd.attach(CMD_RESET, onResetCommand);
     cmd.attach(CMD_DUMP_SETTINGS, onDumpCommand);
     cmd.attach(CMD_SET_BYTE, onSetByteCommand);
+    cmd.attach(CMD_GET_I2C, onGetI2C);
+    cmd.attach(CMD_SET_I2C, onSetI2C);
     cmd.sendCmd(CMD_MSG, "Initialized...");
 }
 
@@ -121,6 +157,20 @@ void handleSettingsDump(byte nodeId) {
     cmd.sendCmdEnd();
 }
 
+void handleI2CReply(byte nodeId) {
+    if (*radio.DataLen != sizeof(SwitchI2CReply)) {
+        cmd.sendCmd(CMD_MSG, "bad i2c reply payload");
+        return;
+    }
+    SwitchI2CReply pkt = *(SwitchI2CReply *)radio.Data;
+    cmd.sendCmdStart(CMD_ACK);
+    cmd.sendCmdArg(nodeId);
+    cmd.sendCmdArg(pkt.address);
+    cmd.sendCmdArg(pkt.reg);
+    cmd.sendCmdArg(pkt.val);
+    cmd.sendCmdEnd();
+}
+
 void handleIncomingPacket() {
     if (!radio.CRCPass()) {
         return;
@@ -137,6 +187,9 @@ void handleIncomingPacket() {
             break;
         case SwitchPacket::DUMP_REPLY:
             handleSettingsDump(nodeId);
+            break;
+        case SwitchPacket::I2C_REPLY:
+            handleI2CReply(nodeId);
             break;
         default:
             cmd.sendCmd(CMD_MSG, "unknown event");

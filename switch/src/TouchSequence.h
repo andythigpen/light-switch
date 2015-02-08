@@ -100,10 +100,11 @@ class TouchSequence {
         // for debugging, prints out the registers of the MPR121
         void dump();
 
-    protected:
+        // i2c set/get functions
         bool setRegister(byte reg, byte val);
         byte getRegister(byte reg);
 
+    protected:
         void applySettings(struct MPR121Settings&);
         void applyFilter(byte baseReg, struct MPR121Filter&);
 
