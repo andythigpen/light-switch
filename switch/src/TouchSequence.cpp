@@ -30,7 +30,7 @@ struct MPR121ConfigLock {
 };
 
 // Interrupt handlers
-static bool interrupted = false;
+static volatile bool interrupted = false;
 static void wakeUpInt0() {
     detachInterrupt(0);
     interrupted = true;
@@ -242,9 +242,9 @@ TouchSequence::update()
     int prevTouchedState = mpr121.touched.all;
 
     // clears the interrupt
+    interrupted = false;
     mpr121.touched.status[0] = getRegister(ELE0_7);
     mpr121.touched.status[1] = getRegister(ELE8_PROX);
-    interrupted = false;
 
     // test to see if there was a change
     if (!(prevTouchedState ^ mpr121.touched.all))
@@ -272,7 +272,7 @@ TouchSequence::update()
     else if (seq[0] != 0xFF)
         proximityEvent = false;
 
-    return isTouched();;
+    return isTouched();
 }
 
 void
