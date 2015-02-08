@@ -60,8 +60,9 @@ def handle_touch_event(msg):
 @CmdMessenger.callback(cmdid=Command.STATUS_EVENT)
 def handle_status_event(msg):
     nodeid = msg.read_int8()
-    vcc = msg.read_int8()
-    print("[{}] status: vcc {}".format(nodeid, vcc))
+    vcc = msg.read_int32()
+    count = msg.read_int16()
+    print("[{}] status: vcc {}, count {}".format(nodeid, vcc, count))
 
 @CmdMessenger.callback(cmdid=Command.DUMP_SETTINGS)
 def handle_dump_settings(msg):

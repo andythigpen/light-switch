@@ -21,6 +21,7 @@ static const int mpr121Addr         = 0x5A;
 static const int mpr121IntPin       = 1;    // int 1 == pin 3
 
 static SwitchSettings cfg;
+static unsigned int statusCount     = 0;
 
 RFM12B radio;
 TouchSequence touch(mpr121Addr, mpr121IntPin);
@@ -230,7 +231,8 @@ void handleEvent(byte repeated) {
 void sendStatus() {
     SwitchStatus pkt;
     pkt.batteryLevel = readVcc();
-    DEBUG("vcc: ", pkt.batteryLevel);
+    pkt.statusCount = statusCount++;
+    DEBUG("vcc: ", pkt.batteryLevel, " cnt: ", pkt.statusCount);
 
     radio.Wakeup();
     radio.Send(GATEWAYID, (const void*)(&pkt), sizeof(pkt), true);

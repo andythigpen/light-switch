@@ -32,6 +32,7 @@ struct TouchEvent : SwitchPacket {
 struct SwitchStatus : SwitchPacket {
     SwitchStatus() : SwitchPacket(STATUS_UPDATE, sizeof(SwitchStatus)) {}
     long batteryLevel;
+    unsigned int statusCount;
 };
 
 struct SwitchReset : SwitchPacket {

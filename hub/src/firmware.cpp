@@ -142,6 +142,7 @@ void handleStatusUpdate(byte nodeId) {
     cmd.sendCmdStart(CMD_STATUS_EVENT);
     cmd.sendCmdArg(nodeId);
     cmd.sendCmdArg(pkt.batteryLevel);
+    cmd.sendCmdArg(pkt.statusCount);
     cmd.sendCmdEnd();
 }
 
