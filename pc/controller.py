@@ -74,6 +74,14 @@ def handle_dump_settings(msg):
     for i in range(0, len(settings), 8):
         print('{:#04x}: {}'.format(i, ' '.join(settings[i:i+8])))
 
+@CmdMessenger.callback(cmdid=Command.GET_I2C)
+def handle_get_i2c(msg):
+    nodeid = msg.read_int8()
+    address = msg.read_int8()
+    register = msg.read_int8()
+    value = msg.read_int8()
+    print("[{}] i2c {:#04x}, register {:#04x} : {:#04x}".format(
+        nodeid, address, register, value))
 
 class SerialInputThread(threading.Thread):
     def __init__(self, msg):
@@ -179,6 +187,7 @@ class ControllerShell(cmd.Cmd):
             w.send_int8(int(offset, 0))
             w.send_int8(int(value, 0))
         msg = self.input_thread.wait_for_ack(1.0)
+        print('Tap switch {} to set configuration.'.format(nodeid))
         if msg:
             print('Tap switch {} to set configuration.'.format(nodeid))
             n = msg.read_int8()
@@ -202,16 +211,6 @@ class ControllerShell(cmd.Cmd):
             w.send_int8(int(address, 0))
             w.send_int8(int(register, 0))
         print('Tap switch {} to get register.'.format(nodeid))
-        msg = self.input_thread.wait_for_ack(10.0)
-        if msg:
-            n = msg.read_int8()
-            a = msg.read_int8()
-            r = msg.read_int8()
-            v = msg.read_int8()
-            print('nodeid:{} address:{:#04x} register:{:#04x} value:{:#04x}'.format(
-                n,a,r,v))
-        else:
-            print('No ACK received')
 
     def do_seti2c(self, args):
         '''Sets an I2C register value, given nodeid, address, register, value:
@@ -228,7 +227,7 @@ class ControllerShell(cmd.Cmd):
             w.send_int8(int(address, 0))
             w.send_int8(int(register, 0))
             w.send_int8(int(value, 0))
-        msg = self.input_thread.wait_for_ack(10.0)
+        msg = self.input_thread.wait_for_ack(1.0)
         if msg:
             print('Tap switch {} to set register.'.format(nodeid))
             n = msg.read_int8()

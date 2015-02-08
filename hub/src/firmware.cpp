@@ -26,7 +26,32 @@ RFM12B radio;
 CmdMessenger cmd(Serial);
 struct {
     byte nodeId;
-    byte pkt[256];
+    byte pkt[RF12_MAXDATA];
+    byte *current;
+
+    void reset() {
+        nodeId = 0;
+        current = pkt;
+    }
+
+    bool available(byte sz) {
+        return sizeof(pkt) - (current - pkt) >= sz;
+    }
+
+    byte *reserve(byte nodeId, byte size) {
+        if (nodeId != this->nodeId)
+            reset();
+        if (!available(size))
+            return NULL;
+        this->nodeId = nodeId;
+        byte *ret = current;
+        current += size;
+        return ret;
+    }
+
+    byte length() {
+        return current - pkt;
+    }
 } command;
 
 void onUnknownCommand() {
@@ -34,8 +59,12 @@ void onUnknownCommand() {
 }
 
 void onResetCommand() {
-    command.nodeId = (byte)cmd.readCharArg();
-    SwitchReset *rst = (SwitchReset *)&command.pkt;
+    byte nodeId = (byte)cmd.readCharArg();
+    SwitchReset *rst = (SwitchReset *)command.reserve(nodeId, sizeof(SwitchReset));
+    if (!rst) {
+        cmd.sendCmd(CMD_MSG, "too many commands");
+        return;
+    }
     rst->type = SwitchPacket::RESET;
     rst->len = sizeof(SwitchReset);
     rst->resetSettings = cmd.readBoolArg() ? 1 : 0;
@@ -43,8 +72,13 @@ void onResetCommand() {
 }
 
 void onDumpCommand() {
-    command.nodeId = (byte)cmd.readCharArg();
-    SwitchDumpSettings *pkt = (SwitchDumpSettings *)&command.pkt;
+    byte nodeId = (byte)cmd.readCharArg();
+    SwitchDumpSettings *pkt = (SwitchDumpSettings *)command.reserve(
+            nodeId, sizeof(SwitchPacket));
+    if (!pkt) {
+        cmd.sendCmd(CMD_MSG, "too many commands");
+        return;
+    }
     pkt->type = SwitchPacket::DUMP_REQUEST;
     pkt->len = sizeof(SwitchPacket);
     cmd.sendCmd(CMD_ACK, "ok");
@@ -54,19 +88,16 @@ void onSetByteCommand() {
     byte nodeId = (byte)cmd.readInt16Arg();
     byte offset = (byte)cmd.readInt16Arg();
     byte value = (byte)cmd.readInt16Arg();
-    SwitchConfigure *pkt = (SwitchConfigure *)&command.pkt;
-    if (nodeId == command.nodeId && pkt->type == SwitchPacket::CONFIGURE) {
-        byte *p = (byte *)pkt;
-        p[pkt->len++] = offset;
-        p[pkt->len++] = value;
+    SwitchConfigure *pkt = (SwitchConfigure *)command.reserve(
+            nodeId, sizeof(SwitchConfigure));
+    if (!pkt) {
+        cmd.sendCmd(CMD_MSG, "too many commands");
+        return;
     }
-    else {
-        command.nodeId = nodeId;
-        pkt->type = SwitchPacket::CONFIGURE;
-        pkt->len = sizeof(SwitchConfigure) + sizeof(SwitchConfigureByte);
-        pkt->cfg[0] = offset;
-        pkt->cfg[1] = value;
-    }
+    pkt->type = SwitchPacket::CONFIGURE;
+    pkt->len = sizeof(SwitchConfigure);
+    pkt->cfg.offset = offset;
+    pkt->cfg.value = value;
     cmd.sendCmdStart(CMD_ACK);
     cmd.sendCmdArg(nodeId);
     cmd.sendCmdArg(offset);
@@ -78,8 +109,12 @@ void onGetI2C() {
     byte nodeId = (byte)cmd.readInt16Arg();
     byte address = (byte)cmd.readInt16Arg();
     byte reg = (byte)cmd.readInt16Arg();
-    SwitchI2CRequest *pkt = (SwitchI2CRequest *)&command.pkt;
-    command.nodeId = nodeId;
+    SwitchI2CRequest *pkt = (SwitchI2CRequest *)command.reserve(
+            nodeId, sizeof(SwitchI2CRequest));
+    if (!pkt) {
+        cmd.sendCmd(CMD_MSG, "too many commands");
+        return;
+    }
     pkt->type = SwitchPacket::I2C_REQUEST;
     pkt->len = sizeof(SwitchI2CRequest);
     pkt->address = address;
@@ -91,8 +126,12 @@ void onSetI2C() {
     byte address = (byte)cmd.readInt16Arg();
     byte reg = (byte)cmd.readInt16Arg();
     byte val = (byte)cmd.readInt16Arg();
-    SwitchI2CSet *pkt = (SwitchI2CSet *)&command.pkt;
-    command.nodeId = nodeId;
+    SwitchI2CSet *pkt = (SwitchI2CSet *)command.reserve(
+            nodeId, sizeof(SwitchI2CSet));
+    if (!pkt) {
+        cmd.sendCmd(CMD_MSG, "too many commands");
+        return;
+    }
     pkt->type = SwitchPacket::I2C_SET;
     pkt->len = sizeof(SwitchI2CSet);
     pkt->address = address;
@@ -109,6 +148,8 @@ void onSetI2C() {
 void setup() {
     Serial.begin(115200);
     radio.Initialize(NODEID, FREQUENCY, NETWORKID);
+
+    command.reset();
 
     cmd.attach(onUnknownCommand);
     cmd.attach(CMD_RESET, onResetCommand);
@@ -164,7 +205,7 @@ void handleI2CReply(byte nodeId) {
         return;
     }
     SwitchI2CReply pkt = *(SwitchI2CReply *)radio.Data;
-    cmd.sendCmdStart(CMD_ACK);
+    cmd.sendCmdStart(CMD_GET_I2C);
     cmd.sendCmdArg(nodeId);
     cmd.sendCmdArg(pkt.address);
     cmd.sendCmdArg(pkt.reg);
@@ -178,31 +219,37 @@ void handleIncomingPacket() {
     }
 
     byte nodeId = radio.GetSender();
-    unsigned char type = *(unsigned char *)radio.Data;
-    switch (type) {
-        case SwitchPacket::TOUCH_EVENT:
-            handleTouchEvent(nodeId);
-            break;
-        case SwitchPacket::STATUS_UPDATE:
-            handleStatusUpdate(nodeId);
-            break;
-        case SwitchPacket::DUMP_REPLY:
-            handleSettingsDump(nodeId);
-            break;
-        case SwitchPacket::I2C_REPLY:
-            handleI2CReply(nodeId);
-            break;
-        default:
-            cmd.sendCmd(CMD_MSG, "unknown event");
-            break;
+    byte data[RF12_MAXDATA];
+    byte datalen = *radio.DataLen;
+    memcpy(data, (void *)radio.Data, datalen);
+    unsigned char offset = 0;
+    while (offset < datalen) {
+        SwitchPacket *header = (SwitchPacket *)(data + offset);
+        switch (header->type) {
+            case SwitchPacket::TOUCH_EVENT:
+                handleTouchEvent(nodeId);
+                break;
+            case SwitchPacket::STATUS_UPDATE:
+                handleStatusUpdate(nodeId);
+                break;
+            case SwitchPacket::DUMP_REPLY:
+                handleSettingsDump(nodeId);
+                break;
+            case SwitchPacket::I2C_REPLY:
+                handleI2CReply(nodeId);
+                break;
+            default:
+                cmd.sendCmd(CMD_MSG, "unknown event");
+                break;
+        }
+        offset += header->len;
     }
 
     if (radio.ACKRequested()) {
         if (command.nodeId == nodeId) {
             cmd.sendCmd(0, "Sending command packet");
-            SwitchPacket *hdr = (SwitchPacket *)&command.pkt;
-            radio.SendACK((void *)&command.pkt, hdr->len);
-            command.nodeId = 0;
+            radio.SendACK((void *)&command.pkt, command.length());
+            command.reset();
         }
         else
             radio.SendACK();

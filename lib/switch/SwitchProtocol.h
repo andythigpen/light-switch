@@ -47,7 +47,7 @@ struct SwitchConfigureByte {
 
 struct SwitchConfigure : SwitchPacket {
     SwitchConfigure() : SwitchPacket(CONFIGURE, sizeof(SwitchConfigure)) {}
-    unsigned char cfg[0];
+    SwitchConfigureByte cfg;
 };
 
 struct SwitchDumpSettings : SwitchPacket {

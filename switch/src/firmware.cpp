@@ -90,28 +90,27 @@ void loadConfiguration() {
 }
 
 void handleReply() {
-    DEBUG("handleReply: ");
-    unsigned char *data = (unsigned char *)radio.Data;
+    DEBUG("handleReply: ", *radio.DataLen);
+    byte data[RF12_MAXDATA];
+    byte datalen = *radio.DataLen;
+    memcpy(data, (void *)radio.Data, datalen);
     unsigned char offset = 0;
     bool settingsChanged = false;
-    while (offset < *radio.DataLen) {
+    while (offset < datalen) {
         SwitchPacket *header = (SwitchPacket *)(data + offset);
+        DEBUG("header type: ", header->type);
         switch (header->type) {
             case SwitchPacket::PING:
                 DEBUG("ping");
                 break;
             case SwitchPacket::CONFIGURE: {
                 SwitchConfigure *pkt = (SwitchConfigure *)header;
-                SwitchConfigureByte *b = (SwitchConfigureByte *)pkt->cfg;
-                while (b < (SwitchConfigureByte *)((byte *)pkt + pkt->len)) {
-                    DEBUG_("set ");
-                    DEBUG_FMT_(b->offset, HEX);
-                    DEBUG_(" : ");
-                    DEBUG_FMT(b->value, HEX);
-                    byte *settings = (byte *)&cfg;
-                    settings[b->offset] = b->value;
-                    b++;
-                }
+                DEBUG_("set ");
+                DEBUG_FMT_(pkt->cfg.offset, HEX);
+                DEBUG_(" : ");
+                DEBUG_FMT(pkt->cfg.value, HEX);
+                byte *settings = (byte *)&cfg;
+                settings[pkt->cfg.offset] = pkt->cfg.value;
                 settingsChanged = true;
                 break;
             }
@@ -178,6 +177,7 @@ void handleReply() {
                 break;
         }
         offset += header->len;
+        DEBUG("offset: ", offset);
     }
 
     if (settingsChanged) {
