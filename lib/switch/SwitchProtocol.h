@@ -9,6 +9,7 @@ struct SwitchPacket {
     enum PacketType {
         TOUCH_EVENT,
         STATUS_UPDATE,
+        STATUS_REQUEST,
         RESET,
         CONFIGURE,
         PING,

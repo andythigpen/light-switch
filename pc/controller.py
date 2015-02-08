@@ -14,6 +14,7 @@ class Command:
     SET_BYTE        = 6
     GET_I2C         = 7
     SET_I2C         = 8
+    STATUS_REQUEST  = 9
 
 electrodes = [
     "top",
@@ -166,6 +167,19 @@ class ControllerShell(cmd.Cmd):
             return
         self._reset_command(self.nodeid, hard=True)
 
+    def do_status(self, args):
+        'Request status from switch'
+        if not self.nodeid:
+            print('Must select a node first')
+            return
+        with self.msg.writer(cmdid=Command.STATUS_REQUEST) as w:
+            w.send_int16(self.nodeid)
+        msg = self.input_thread.wait_for_ack(1.0)
+        if msg:
+            print('Tap switch {} to get status.'.format(self.nodeid))
+        else:
+            print('No ACK received')
+
     def do_dump(self, args):
         'Dump switch settings'
         if not self.nodeid:
@@ -212,7 +226,14 @@ class ControllerShell(cmd.Cmd):
             w.send_int8(self.nodeid)
             w.send_int8(int(address, 0))
             w.send_int8(int(register, 0))
-        print('Tap switch {} to get register.'.format(self.nodeid))
+        if msg:
+            print('Tap switch {} to get register.'.format(self.nodeid))
+            n = msg.read_int8()
+            a = msg.read_int8()
+            r = msg.read_int8()
+            print('nodeid:{} address:{:#04x} register:{:#04x}'.format(n,a,r))
+        else:
+            print('No ACK received')
 
     def do_seti2c(self, args):
         '''Sets an I2C register value, given address, register, value:

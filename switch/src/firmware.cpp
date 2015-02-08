@@ -28,6 +28,7 @@ TouchSequence touch(mpr121Addr, mpr121IntPin);
 period_t sleepPeriod = SLEEP_FOREVER;
 
 extern long readVcc();
+void sendStatus();
 
 void softReset() {
 #if !defined(NDEBUG)
@@ -102,6 +103,10 @@ void handleReply() {
         switch (header->type) {
             case SwitchPacket::PING:
                 DEBUG("ping");
+                break;
+            case SwitchPacket::STATUS_REQUEST:
+                DEBUG("status request: ");
+                sendStatus();
                 break;
             case SwitchPacket::CONFIGURE: {
                 SwitchConfigure *pkt = (SwitchConfigure *)header;

@@ -22,6 +22,7 @@ RFM12B radio;
 #define CMD_SET_BYTE        6
 #define CMD_GET_I2C         7
 #define CMD_SET_I2C         8
+#define CMD_STATUS_REQUEST  9
 
 CmdMessenger cmd(Serial);
 struct {
@@ -105,7 +106,7 @@ void onSetByteCommand() {
     cmd.sendCmdEnd();
 }
 
-void onGetI2C() {
+void onGetI2CCommand() {
     byte nodeId = (byte)cmd.readInt16Arg();
     byte address = (byte)cmd.readInt16Arg();
     byte reg = (byte)cmd.readInt16Arg();
@@ -119,9 +120,14 @@ void onGetI2C() {
     pkt->len = sizeof(SwitchI2CRequest);
     pkt->address = address;
     pkt->reg = reg;
+    cmd.sendCmdStart(CMD_ACK);
+    cmd.sendCmdArg(nodeId);
+    cmd.sendCmdArg(address);
+    cmd.sendCmdArg(reg);
+    cmd.sendCmdEnd();
 }
 
-void onSetI2C() {
+void onSetI2CCommand() {
     byte nodeId = (byte)cmd.readInt16Arg();
     byte address = (byte)cmd.readInt16Arg();
     byte reg = (byte)cmd.readInt16Arg();
@@ -145,6 +151,19 @@ void onSetI2C() {
     cmd.sendCmdEnd();
 }
 
+void onStatusRequestCommand() {
+    byte nodeId = (byte)cmd.readInt16Arg();
+    SwitchPacket *pkt = (SwitchPacket *)command.reserve(
+            nodeId, sizeof(SwitchPacket));
+    if (!pkt) {
+        cmd.sendCmd(CMD_MSG, "too many commands");
+        return;
+    }
+    pkt->type = SwitchPacket::STATUS_REQUEST;
+    pkt->len = sizeof(SwitchPacket);
+    cmd.sendCmd(CMD_ACK, "ok");
+}
+
 void setup() {
     Serial.begin(115200);
     radio.Initialize(NODEID, FREQUENCY, NETWORKID);
@@ -155,8 +174,9 @@ void setup() {
     cmd.attach(CMD_RESET, onResetCommand);
     cmd.attach(CMD_DUMP_SETTINGS, onDumpCommand);
     cmd.attach(CMD_SET_BYTE, onSetByteCommand);
-    cmd.attach(CMD_GET_I2C, onGetI2C);
-    cmd.attach(CMD_SET_I2C, onSetI2C);
+    cmd.attach(CMD_GET_I2C, onGetI2CCommand);
+    cmd.attach(CMD_SET_I2C, onSetI2CCommand);
+    cmd.attach(CMD_STATUS_REQUEST, onStatusRequestCommand);
     cmd.sendCmd(CMD_MSG, "Initialized...");
 }
 
@@ -223,6 +243,7 @@ void handleIncomingPacket() {
     byte datalen = *radio.DataLen;
     memcpy(data, (void *)radio.Data, datalen);
     unsigned char offset = 0;
+    bool ackRequested = radio.ACKRequested();
     while (offset < datalen) {
         SwitchPacket *header = (SwitchPacket *)(data + offset);
         switch (header->type) {
@@ -245,7 +266,7 @@ void handleIncomingPacket() {
         offset += header->len;
     }
 
-    if (radio.ACKRequested()) {
+    if (ackRequested) {
         if (command.nodeId == nodeId) {
             cmd.sendCmd(0, "Sending command packet");
             radio.SendACK((void *)&command.pkt, command.length());
