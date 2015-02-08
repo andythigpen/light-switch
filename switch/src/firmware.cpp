@@ -229,6 +229,8 @@ void setup() {
 
     touch.enableInterrupt();
     touch.dump();
+
+    sendStatus();
 }
 
 void loop() {
