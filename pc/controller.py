@@ -106,7 +106,7 @@ class SerialInputThread(threading.Thread):
 
 class ControllerShell(cmd.Cmd):
     intro = 'switch controller shell.  Type help or ? to list commands.\n'
-    prompt = 'command> '
+    prompt = 'hub> '
     connected = False
 
     def emptyline(self):
@@ -134,6 +134,14 @@ class ControllerShell(cmd.Cmd):
         self.input_thread.start()
         self.connected = True
 
+    def do_node(self, args):
+        'Sets the current nodeid: node 2'
+        try:
+            self.nodeid = int(args)
+            self.prompt = 'node:{}> '.format(self.nodeid)
+        except:
+            print("Invalid node id: {}".format(args))
+
     def _reset_command(self, nodeid, hard=False):
         with self.msg.writer(cmdid=Command.RESET) as w:
             w.send_char(int(nodeid))
@@ -145,51 +153,47 @@ class ControllerShell(cmd.Cmd):
             print('No ACK received')
 
     def do_reset(self, args):
-        'Reset a switch given a node id: reset 2'
-        nodeid, args = args.partition(' ')[::2]
-        if not nodeid:
-            print('Missing required nodeid')
+        'Reset the current switch'
+        if not self.nodeid:
+            print('Must select a node first')
             return
-        self._reset_command(nodeid)
+        self._reset_command(self.nodeid)
 
     def do_hardreset(self, args):
-        'Reset a switch and its settings given a node id: hardreset 2'
-        nodeid, args = args.partition(' ')[::2]
-        if not nodeid:
-            print('Missing required nodeid')
+        'Reset the current switch and its settings'
+        if not self.nodeid:
+            print('Must select a node first')
             return
-        self._reset_command(nodeid, hard=True)
+        self._reset_command(self.nodeid, hard=True)
 
     def do_dump(self, args):
-        'Dump switch settings given a node id: dump 2'
-        nodeid, args = args.partition(' ')[::2]
-        if not nodeid:
-            print('Missing required nodeid')
+        'Dump switch settings'
+        if not self.nodeid:
+            print('Must select a node first')
             return
         with self.msg.writer(cmdid=Command.DUMP_SETTINGS) as w:
-            w.send_char(int(nodeid))
+            w.send_char(self.nodeid)
         msg = self.input_thread.wait_for_ack(1.0)
         if msg:
-            print('Tap switch {} to dump settings.'.format(nodeid))
+            print('Tap switch {} to dump settings.'.format(self.nodeid))
         else:
             print('No ACK received')
 
     def do_setbyte(self, args):
-        'Sets a configuration byte, given nodeid, offset, value: setbyte 2 2 2'
-        nodeid, args = args.partition(' ')[::2]
+        'Sets a configuration byte, given offset, value: setbyte 2 2'
         offset, args = args.partition(' ')[::2]
         value, args = args.partition(' ')[::2]
-        if not nodeid or not offset or not value:
+        if not self.nodeid or not offset or not value:
             print('Missing required argument')
             return
         with self.msg.writer(cmdid=Command.SET_BYTE) as w:
-            w.send_int8(int(nodeid, 0))
+            w.send_int8(self.nodeid)
             w.send_int8(int(offset, 0))
             w.send_int8(int(value, 0))
         msg = self.input_thread.wait_for_ack(1.0)
-        print('Tap switch {} to set configuration.'.format(nodeid))
+        print('Tap switch {} to set configuration.'.format(self.nodeid))
         if msg:
-            print('Tap switch {} to set configuration.'.format(nodeid))
+            print('Tap switch {} to set configuration.'.format(self.nodeid))
             n = msg.read_int8()
             o = msg.read_int8()
             v = msg.read_int8()
@@ -198,38 +202,35 @@ class ControllerShell(cmd.Cmd):
             print('No ACK received')
 
     def do_geti2c(self, args):
-        '''Gets an I2C register value, given nodeid, address, register:
-           geti2c 2 0x5A 0x20'''
-        nodeid, args = args.partition(' ')[::2]
+        '''Gets an I2C register value, given address, register: geti2c 0x5A 0x20'''
         address, args = args.partition(' ')[::2]
         register, args = args.partition(' ')[::2]
-        if not nodeid or not address or not register:
+        if not self.nodeid or not address or not register:
             print('Missing required argument')
             return
         with self.msg.writer(cmdid=Command.GET_I2C) as w:
-            w.send_int8(int(nodeid, 0))
+            w.send_int8(self.nodeid)
             w.send_int8(int(address, 0))
             w.send_int8(int(register, 0))
-        print('Tap switch {} to get register.'.format(nodeid))
+        print('Tap switch {} to get register.'.format(self.nodeid))
 
     def do_seti2c(self, args):
-        '''Sets an I2C register value, given nodeid, address, register, value:
-           geti2c 2 0x5A 0x20 0x12'''
-        nodeid, args = args.partition(' ')[::2]
+        '''Sets an I2C register value, given address, register, value:
+           seti2c 0x5A 0x20 0x12'''
         address, args = args.partition(' ')[::2]
         register, args = args.partition(' ')[::2]
         value, args = args.partition(' ')[::2]
-        if not nodeid or not address or not register or not value:
+        if not self.nodeid or not address or not register or not value:
             print('Missing required argument')
             return
         with self.msg.writer(cmdid=Command.SET_I2C) as w:
-            w.send_int8(int(nodeid, 0))
+            w.send_int8(self.nodeid)
             w.send_int8(int(address, 0))
             w.send_int8(int(register, 0))
             w.send_int8(int(value, 0))
         msg = self.input_thread.wait_for_ack(1.0)
         if msg:
-            print('Tap switch {} to set register.'.format(nodeid))
+            print('Tap switch {} to set register.'.format(self.nodeid))
             n = msg.read_int8()
             a = msg.read_int8()
             r = msg.read_int8()
