@@ -197,8 +197,8 @@ void sendStatus() {
     DEBUG("vcc: ", pkt.batteryLevel);
 
     radio.Wakeup();
-    radio.Send(GATEWAYID, (const void*)(&pkt), sizeof(pkt), false);
-    radio.Sleep(cfg.sleep.statusInterval, cfg.sleep.statusScaler);
+    radio.Send(GATEWAYID, (const void*)(&pkt), sizeof(pkt), true);
+    waitForReply();
 }
 
 void setup() {
