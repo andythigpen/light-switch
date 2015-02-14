@@ -116,6 +116,7 @@ class ControllerShell(cmd.Cmd):
     def do_connect(self, args):
         'Connect to a serial port'
         if self.connected:
+            print('Already connected to {}'.format(self.connection.name))
             return
         port, args = args.partition(' ')[::2]
         baud, args = args.partition(' ')[::2]
@@ -134,6 +135,15 @@ class ControllerShell(cmd.Cmd):
         self.input_thread = SerialInputThread(self.msg)
         self.input_thread.start()
         self.connected = True
+
+    def do_disconnect(self, args):
+        'Disconnect from serial port'
+        if not self.connected:
+            print('Not connected')
+            return
+        self.input_thread.running = False
+        self.connected = False
+        self.connection.close()
 
     def do_node(self, args):
         'Sets the current nodeid: node 2'
@@ -205,7 +215,6 @@ class ControllerShell(cmd.Cmd):
             w.send_int8(int(offset, 0))
             w.send_int8(int(value, 0))
         msg = self.input_thread.wait_for_ack(1.0)
-        print('Tap switch {} to set configuration.'.format(self.nodeid))
         if msg:
             print('Tap switch {} to set configuration.'.format(self.nodeid))
             n = msg.read_int8()
@@ -226,6 +235,7 @@ class ControllerShell(cmd.Cmd):
             w.send_int8(self.nodeid)
             w.send_int8(int(address, 0))
             w.send_int8(int(register, 0))
+        msg = self.input_thread.wait_for_ack(1.0)
         if msg:
             print('Tap switch {} to get register.'.format(self.nodeid))
             n = msg.read_int8()
