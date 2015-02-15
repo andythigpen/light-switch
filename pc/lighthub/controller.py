@@ -1,7 +1,7 @@
 import binascii
 import cmd
 from cmdmessenger import CmdMessengerHandler
-from hub import LightSwitchHub, Command, LightSwitchHubTimeout
+from lighthub.hub import LightSwitchHub, Command, LightSwitchHubTimeout
 
 
 class Handler(CmdMessengerHandler):
