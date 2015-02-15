@@ -1,31 +1,35 @@
 import binascii
 import cmd
 from cmdmessenger import CmdMessengerHandler
-from lighthub.hub import LightSwitchHub, Command, LightSwitchHubTimeout
+from lighthub.hub import (LightSwitchHub,
+                          Command,
+                          Gesture,
+                          Electrode,
+                          LightSwitchHubTimeout)
 
 
 class Handler(CmdMessengerHandler):
-    @CmdMessengerHandler.handler(cmdid=Command.MSG)
+    @CmdMessengerHandler.handler(cmdid=Command.msg)
     def handle_debug(self, msg):
         print("hub: {}".format(msg.read_str()))
 
-    @CmdMessengerHandler.handler(cmdid=Command.TOUCH_EVENT)
+    @CmdMessengerHandler.handler(cmdid=Command.touch_event)
     def handle_touch_event(self, msg):
         nodeid = msg.read_int8()
-        gesture = Command.GESTURES[msg.read_int8()]
-        electrode = Command.ELECTRODES[msg.read_int8()]
+        gesture = Gesture(msg.read_int8())
+        electrode = Electrode(msg.read_int8())
         repeat = msg.read_int8()
         print('[{}] gesture: {}, electrode: {}, repeat: {}'.format(nodeid,
             gesture, electrode, repeat))
 
-    @CmdMessengerHandler.handler(cmdid=Command.STATUS_EVENT)
+    @CmdMessengerHandler.handler(cmdid=Command.status_event)
     def handle_status_event(self, msg):
         nodeid = msg.read_int8()
         vcc = msg.read_int32()
         count = msg.read_int16()
         print("[{}] status: vcc {}, count {}".format(nodeid, vcc, count))
 
-    @CmdMessengerHandler.handler(cmdid=Command.DUMP_SETTINGS)
+    @CmdMessengerHandler.handler(cmdid=Command.dump_settings)
     def handle_dump_settings(self, msg):
         nodeid = msg.read_int8()
         print("[{}] Dump settings:".format(nodeid))
@@ -35,7 +39,7 @@ class Handler(CmdMessengerHandler):
         for i in range(0, len(settings), 8):
             print('{:#04x}: {}'.format(i, ' '.join(settings[i:i+8])))
 
-    @CmdMessengerHandler.handler(cmdid=Command.GET_I2C)
+    @CmdMessengerHandler.handler(cmdid=Command.get_i2c)
     def handle_get_i2c(self, msg):
         nodeid = msg.read_int8()
         address = msg.read_int8()

@@ -1,6 +1,7 @@
 import inspect
 import struct
 import re
+from enum import Enum
 
 class CmdMessengerWriter(object):
     def __init__(self, stream, field_sep, cmd_sep, escape_sep, cmdid):
@@ -133,6 +134,8 @@ class CmdMessengerHandler(object):
            bind callback handlers to the given command id.'''
         def decorator(f):
             f._cmdmessenger_cmdid = cmdid
+            if isinstance(f._cmdmessenger_cmdid, Enum):
+                f._cmdmessenger_cmdid = f._cmdmessenger_cmdid.value
             return f
         return decorator
 
