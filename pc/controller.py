@@ -1,60 +1,19 @@
-import serial
-from cmdmessenger import CmdMessenger, CmdMessengerHandler
-import threading
 import binascii
 import cmd
+from cmdmessenger import CmdMessengerHandler
+from hub import LightSwitchHub, Command, LightSwitchHubTimeout
 
-class Command:
-    MSG             = 0
-    ACK             = 1
-    TOUCH_EVENT     = 2
-    STATUS_EVENT    = 3
-    DUMP_SETTINGS   = 4
-    RESET           = 5
-    SET_BYTE        = 6
-    GET_I2C         = 7
-    SET_I2C         = 8
-    STATUS_REQUEST  = 9
-
-electrodes = [
-    "top",
-    "left",
-    "bottom",
-    "right",
-    "center",
-]
-
-gestures = [
-    "unknown",
-    "tap",
-    "double_tap",
-    "swipe_up",
-    "swipe_down",
-    "swipe_left",
-    "swipe_right",
-]
-
-ack_condition = threading.Condition()
-ack_msg = None
 
 class Handler(CmdMessengerHandler):
     @CmdMessengerHandler.handler(cmdid=Command.MSG)
     def handle_debug(self, msg):
-        print("debug: {}".format(msg.read_str()))
-
-    @CmdMessengerHandler.handler(cmdid=Command.ACK)
-    def handle_ack(self, msg):
-        global ack_msg
-        ack_condition.acquire()
-        ack_msg = msg
-        ack_condition.notify()
-        ack_condition.release()
+        print("hub: {}".format(msg.read_str()))
 
     @CmdMessengerHandler.handler(cmdid=Command.TOUCH_EVENT)
     def handle_touch_event(self, msg):
         nodeid = msg.read_int8()
-        gesture = gestures[msg.read_int8()]
-        electrode = electrodes[msg.read_int8()]
+        gesture = Command.GESTURES[msg.read_int8()]
+        electrode = Command.ELECTRODES[msg.read_int8()]
         repeat = msg.read_int8()
         print('[{}] gesture: {}, electrode: {}, repeat: {}'.format(nodeid,
             gesture, electrode, repeat))
@@ -86,29 +45,6 @@ class Handler(CmdMessengerHandler):
             nodeid, address, register, value))
 
 
-class SerialInputThread(threading.Thread):
-    def __init__(self, msg):
-        super(SerialInputThread, self).__init__()
-        self.msg = msg
-        self.running = False
-
-    def run(self):
-        print("Starting input thread...")
-        self.running = True
-        while self.running:
-            self.msg.read()
-        print("Closing input thread...")
-
-    def wait_for_ack(self, timeout=None):
-        global ack_msg
-        ack_condition.acquire()
-        ack_msg = None
-        ack_condition.wait(timeout)
-        ret = ack_msg
-        ack_condition.release()
-        return ack_msg
-
-
 class ControllerShell(cmd.Cmd):
     intro = 'switch controller shell.  Type help or ? to list commands.\n'
     prompt = 'hub> '
@@ -119,8 +55,8 @@ class ControllerShell(cmd.Cmd):
 
     def do_connect(self, args):
         'Connect to a serial port'
-        if self.connected:
-            print('Already connected to {}'.format(self.connection.name))
+        if hasattr(self, 'hub') and self.hub.connected:
+            print('Already connected to {}'.format(self.hub.connection.name))
             return
         port, args = args.partition(' ')[::2]
         baud, args = args.partition(' ')[::2]
@@ -128,28 +64,19 @@ class ControllerShell(cmd.Cmd):
         port = port or '/dev/ttyUSB0'
         baud = int(baud or 115200)
         timeout = float(timeout or 1.0)
+
         print("Connecting to {} at {} baud, timeout {}".format(port, baud, timeout))
-        try:
-            self.connection = serial.Serial(port, baudrate=baud, timeout=timeout)
-        except serial.serialutil.SerialException as e:
-            print(e)
-            return
-        self.msg = CmdMessenger(self.connection)
-        Handler(self.msg)
-        self.input_thread = SerialInputThread(self.msg)
-        self.input_thread.start()
-        self.connected = True
+        self.hub = LightSwitchHub(handlers=Handler())
+        self.hub.connect(port, baud, timeout)
         self.nodeid = None
 
     def do_disconnect(self, args):
         'Disconnect from serial port'
-        if not self.connected:
+        if not hasattr(self, 'hub') or not self.hub.connected:
             print('Not connected')
             return
         print("Disconnecting...")
-        self.input_thread.running = False
-        self.connected = False
-        self.connection.close()
+        self.hub.disconnect()
 
     def do_node(self, args):
         'Sets the current nodeid: node 2'
@@ -159,41 +86,37 @@ class ControllerShell(cmd.Cmd):
         except:
             print("Invalid node id: {}".format(args))
 
-    def _reset_command(self, nodeid, hard=False):
-        with self.msg.writer(cmdid=Command.RESET) as w:
-            w.send_char(int(nodeid))
-            w.send_bool(hard)
-        msg = self.input_thread.wait_for_ack(1.0)
-        if msg:
-            print('Tap switch {} to reset.'.format(nodeid))
-        else:
-            print('No ACK received')
-
     def do_reset(self, args):
         'Reset the current switch'
         if not self.nodeid:
             print('Must select a node first')
             return
-        self._reset_command(self.nodeid)
+        try:
+            msg = self.hub.reset(self.nodeid)
+            print('Tap switch {} to reset.'.format(self.nodeid))
+        except LightSwitchHubTimeout:
+            print('No ACK received')
 
     def do_hardreset(self, args):
         'Reset the current switch and its settings'
         if not self.nodeid:
             print('Must select a node first')
             return
-        self._reset_command(self.nodeid, hard=True)
+        try:
+            msg = self.hub.reset(self.nodeid, hard=True)
+            print('Tap switch {} to reset.'.format(self.nodeid))
+        except LightSwitchHubTimeout:
+            print('No ACK received')
 
     def do_status(self, args):
         'Request status from switch'
         if not self.nodeid:
             print('Must select a node first')
             return
-        with self.msg.writer(cmdid=Command.STATUS_REQUEST) as w:
-            w.send_int16(self.nodeid)
-        msg = self.input_thread.wait_for_ack(1.0)
-        if msg:
+        try:
+            msg = self.hub.status(self.nodeid)
             print('Tap switch {} to get status.'.format(self.nodeid))
-        else:
+        except LightSwitchHubTimeout:
             print('No ACK received')
 
     def do_dump(self, args):
@@ -201,12 +124,10 @@ class ControllerShell(cmd.Cmd):
         if not self.nodeid:
             print('Must select a node first')
             return
-        with self.msg.writer(cmdid=Command.DUMP_SETTINGS) as w:
-            w.send_char(self.nodeid)
-        msg = self.input_thread.wait_for_ack(1.0)
-        if msg:
+        try:
+            msg = self.hub.dump(self.nodeid)
             print('Tap switch {} to dump settings.'.format(self.nodeid))
-        else:
+        except LightSwitchHubTimeout:
             print('No ACK received')
 
     def do_setbyte(self, args):
@@ -216,18 +137,14 @@ class ControllerShell(cmd.Cmd):
         if not self.nodeid or not offset or not value:
             print('Missing required argument')
             return
-        with self.msg.writer(cmdid=Command.SET_BYTE) as w:
-            w.send_int8(self.nodeid)
-            w.send_int8(int(offset, 0))
-            w.send_int8(int(value, 0))
-        msg = self.input_thread.wait_for_ack(1.0)
-        if msg:
+        try:
+            msg = self.hub.dump(self.nodeid, offset, value)
             print('Tap switch {} to set configuration.'.format(self.nodeid))
             n = msg.read_int8()
             o = msg.read_int8()
             v = msg.read_int8()
             print('nodeid:{} offset:{:#04x} value:{:#04x}'.format(n,o,v))
-        else:
+        except LightSwitchHubTimeout:
             print('No ACK received')
 
     def do_geti2c(self, args):
@@ -237,18 +154,14 @@ class ControllerShell(cmd.Cmd):
         if not self.nodeid or not address or not register:
             print('Missing required argument')
             return
-        with self.msg.writer(cmdid=Command.GET_I2C) as w:
-            w.send_int8(self.nodeid)
-            w.send_int8(int(address, 0))
-            w.send_int8(int(register, 0))
-        msg = self.input_thread.wait_for_ack(1.0)
-        if msg:
+        try:
+            msg = self.hub.geti2c(self.nodeid, address, register)
             print('Tap switch {} to get register.'.format(self.nodeid))
             n = msg.read_int8()
             a = msg.read_int8()
             r = msg.read_int8()
             print('nodeid:{} address:{:#04x} register:{:#04x}'.format(n,a,r))
-        else:
+        except LightSwitchHubTimeout:
             print('No ACK received')
 
     def do_seti2c(self, args):
@@ -260,13 +173,8 @@ class ControllerShell(cmd.Cmd):
         if not self.nodeid or not address or not register or not value:
             print('Missing required argument')
             return
-        with self.msg.writer(cmdid=Command.SET_I2C) as w:
-            w.send_int8(self.nodeid)
-            w.send_int8(int(address, 0))
-            w.send_int8(int(register, 0))
-            w.send_int8(int(value, 0))
-        msg = self.input_thread.wait_for_ack(1.0)
-        if msg:
+        try:
+            msg = self.hub.seti2c(self.nodeid, address, register, value)
             print('Tap switch {} to set register.'.format(self.nodeid))
             n = msg.read_int8()
             a = msg.read_int8()
@@ -274,14 +182,13 @@ class ControllerShell(cmd.Cmd):
             v = msg.read_int8()
             print('nodeid:{} address:{:#04x} register:{:#04x} value:{:#04x}'.format(
                 n,a,r,v))
-        else:
+        except LightSwitchHubTimeout:
             print('No ACK received')
 
     def do_exit(self, args):
         'Exits the shell'
-        if self.connected:
-            self.connection.close()
-            self.input_thread.running = False
+        if hasattr(self, 'hub') and self.hub.connected:
+            self.hub.disconnect()
         return True
 
 if __name__ == '__main__':
@@ -291,5 +198,5 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         print()
     finally:
-        if c.connected:
-            c.input_thread.running = False
+        if hasattr(c, 'hub') and c.hub.connected:
+            c.hub.disconnect()
