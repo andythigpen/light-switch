@@ -1,5 +1,5 @@
 import serial
-from cmdmessenger import CmdMessenger
+from cmdmessenger import CmdMessenger, CmdMessengerHandler
 import threading
 import binascii
 import cmd
@@ -37,52 +37,54 @@ gestures = [
 ack_condition = threading.Condition()
 ack_msg = None
 
-@CmdMessenger.callback(cmdid=Command.MSG)
-def handle_debug(msg):
-    print("debug: {}".format(msg.read_str()))
+class Handler(CmdMessengerHandler):
+    @CmdMessengerHandler.handler(cmdid=Command.MSG)
+    def handle_debug(self, msg):
+        print("debug: {}".format(msg.read_str()))
 
-@CmdMessenger.callback(cmdid=Command.ACK)
-def handle_ack(msg):
-    global ack_msg
-    ack_condition.acquire()
-    ack_msg = msg
-    ack_condition.notify()
-    ack_condition.release()
+    @CmdMessengerHandler.handler(cmdid=Command.ACK)
+    def handle_ack(self, msg):
+        global ack_msg
+        ack_condition.acquire()
+        ack_msg = msg
+        ack_condition.notify()
+        ack_condition.release()
 
-@CmdMessenger.callback(cmdid=Command.TOUCH_EVENT)
-def handle_touch_event(msg):
-    nodeid = msg.read_int8()
-    gesture = gestures[msg.read_int8()]
-    electrode = electrodes[msg.read_int8()]
-    repeat = msg.read_int8()
-    print('[{}] gesture: {}, electrode: {}, repeat: {}'.format(nodeid,
-        gesture, electrode, repeat))
+    @CmdMessengerHandler.handler(cmdid=Command.TOUCH_EVENT)
+    def handle_touch_event(self, msg):
+        nodeid = msg.read_int8()
+        gesture = gestures[msg.read_int8()]
+        electrode = electrodes[msg.read_int8()]
+        repeat = msg.read_int8()
+        print('[{}] gesture: {}, electrode: {}, repeat: {}'.format(nodeid,
+            gesture, electrode, repeat))
 
-@CmdMessenger.callback(cmdid=Command.STATUS_EVENT)
-def handle_status_event(msg):
-    nodeid = msg.read_int8()
-    vcc = msg.read_int32()
-    count = msg.read_int16()
-    print("[{}] status: vcc {}, count {}".format(nodeid, vcc, count))
+    @CmdMessengerHandler.handler(cmdid=Command.STATUS_EVENT)
+    def handle_status_event(self, msg):
+        nodeid = msg.read_int8()
+        vcc = msg.read_int32()
+        count = msg.read_int16()
+        print("[{}] status: vcc {}, count {}".format(nodeid, vcc, count))
 
-@CmdMessenger.callback(cmdid=Command.DUMP_SETTINGS)
-def handle_dump_settings(msg):
-    nodeid = msg.read_int8()
-    print("[{}] Dump settings:".format(nodeid))
-    settings = msg.read_bytes()
-    settings = str(binascii.hexlify(settings), 'ascii')
-    settings = [settings[i:i+2] for i in range(0, len(settings), 2)]
-    for i in range(0, len(settings), 8):
-        print('{:#04x}: {}'.format(i, ' '.join(settings[i:i+8])))
+    @CmdMessengerHandler.handler(cmdid=Command.DUMP_SETTINGS)
+    def handle_dump_settings(self, msg):
+        nodeid = msg.read_int8()
+        print("[{}] Dump settings:".format(nodeid))
+        settings = msg.read_bytes()
+        settings = str(binascii.hexlify(settings), 'ascii')
+        settings = [settings[i:i+2] for i in range(0, len(settings), 2)]
+        for i in range(0, len(settings), 8):
+            print('{:#04x}: {}'.format(i, ' '.join(settings[i:i+8])))
 
-@CmdMessenger.callback(cmdid=Command.GET_I2C)
-def handle_get_i2c(msg):
-    nodeid = msg.read_int8()
-    address = msg.read_int8()
-    register = msg.read_int8()
-    value = msg.read_int8()
-    print("[{}] i2c {:#04x}, register {:#04x} : {:#04x}".format(
-        nodeid, address, register, value))
+    @CmdMessengerHandler.handler(cmdid=Command.GET_I2C)
+    def handle_get_i2c(self, msg):
+        nodeid = msg.read_int8()
+        address = msg.read_int8()
+        register = msg.read_int8()
+        value = msg.read_int8()
+        print("[{}] i2c {:#04x}, register {:#04x} : {:#04x}".format(
+            nodeid, address, register, value))
+
 
 class SerialInputThread(threading.Thread):
     def __init__(self, msg):
@@ -91,9 +93,11 @@ class SerialInputThread(threading.Thread):
         self.running = False
 
     def run(self):
+        print("Starting input thread...")
         self.running = True
         while self.running:
             self.msg.read()
+        print("Closing input thread...")
 
     def wait_for_ack(self, timeout=None):
         global ack_msg
@@ -131,16 +135,18 @@ class ControllerShell(cmd.Cmd):
             print(e)
             return
         self.msg = CmdMessenger(self.connection)
-        print("Starting input thread...")
+        Handler(self.msg)
         self.input_thread = SerialInputThread(self.msg)
         self.input_thread.start()
         self.connected = True
+        self.nodeid = None
 
     def do_disconnect(self, args):
         'Disconnect from serial port'
         if not self.connected:
             print('Not connected')
             return
+        print("Disconnecting...")
         self.input_thread.running = False
         self.connected = False
         self.connection.close()

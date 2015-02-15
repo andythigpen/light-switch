@@ -1,3 +1,4 @@
+import inspect
 import struct
 import re
 
@@ -115,8 +116,29 @@ class CmdMessengerReader(object):
         return self._next(escaped=True)
 
 
+class CmdMessengerHandler(object):
+    '''Helper object for grouping/registering handler functions.'''
+
+    def __init__(self, messenger=None):
+        '''Constructs a CmdMessengerHandler object.
+           Note: If messenger is None, the handler methods must be manually
+                 registered with a messenger object
+        '''
+        if messenger is not None:
+            messenger.register_object(self)
+
+    @staticmethod
+    def handler(cmdid):
+        '''Decorator that when used with CmdMessenger.register_object() will
+           bind callback handlers to the given command id.'''
+        def decorator(f):
+            f._cmdmessenger_cmdid = cmdid
+            return f
+        return decorator
+
+
 class CmdMessenger(object):
-    cmd_callbacks = {}
+    '''Communicates with CmdMessenger Arduino library via a serial port.'''
 
     def __init__(self, stream, field=b',', cmd=b';', escape=b'/'):
         self.stream = stream
@@ -125,13 +147,23 @@ class CmdMessenger(object):
         self.escape_sep = escape
         self.input_buffer = bytearray()
         self.message_available = False
+        self.cmd_callbacks = {}
 
-    @classmethod
-    def callback(cls, cmdid):
-        def decorator(f):
-            cls.cmd_callbacks[cmdid] = f
-            return f
-        return decorator
+    def register(self, cmdid, callback):
+        '''Registers a callback function for a command ID.
+           callback should match the signature:
+           def callback(messenger):
+               pass # handle the message here
+        '''
+        self.cmd_callbacks[cmdid] = callback
+
+    def register_object(self, obj):
+        '''Registers callback functions from an object.
+           Use @CmdMessengerHandler.handler(cmdid) to decorate callback functions.
+        '''
+        for m in inspect.getmembers(obj, predicate=inspect.ismethod):
+            if hasattr(m[1], '_cmdmessenger_cmdid'):
+                self.register(m[1]._cmdmessenger_cmdid, m[1])
 
     def writer(self, cmdid):
         return CmdMessengerWriter(self.stream, self.field_sep, self.cmd_sep,
