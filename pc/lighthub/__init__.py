@@ -1,1 +1,1 @@
-from lighthub import *
+from lighthub.hub import *
