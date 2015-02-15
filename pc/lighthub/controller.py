@@ -191,7 +191,7 @@ class ControllerShell(cmd.Cmd):
             self.hub.disconnect()
         return True
 
-if __name__ == '__main__':
+def main():
     c = ControllerShell()
     try:
         c.cmdloop()
@@ -200,3 +200,6 @@ if __name__ == '__main__':
     finally:
         if hasattr(c, 'hub') and c.hub.connected:
             c.hub.disconnect()
+
+if __name__ == '__main__':
+    main()
